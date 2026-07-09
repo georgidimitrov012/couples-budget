@@ -1,3 +1,57 @@
-# Expo HAS CHANGED
+# CLAUDE.md — Couples Budget + Shared Shopping List
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+This file tells Claude Code how to work in this repo. Read it before generating code.
+
+## What we're building
+A mobile app for couples with two core features:
+1. A shared budget with a **"Yours / Mine / Ours"** model.
+2. A **real-time shared shopping list** that updates live on both partners' phones.
+
+A "household" is a couple (max 2 members). One partner creates it; the other joins
+with a 6-character invite code.
+
+## Stack
+- **Expo** (latest stable SDK) + **Expo Router** (file-based routing), **TypeScript strict**
+- **Supabase**: Postgres, Auth, Row-Level Security, Realtime (websockets)
+- `expo-secure-store` for tokens/sensitive data
+- Realtime + optimistic UI for the shopping list (no offline sync engine in the MVP)
+- **EAS Build / EAS Submit** for shipping
+- Package manager: **pnpm ONLY**. Never run `npm` or `yarn`. Use `pnpm`, `pnpm dlx`, `pnpm expo …`.
+
+## The data model (see schema.sql)
+- `profiles` — 1:1 with auth.users
+- `households` + `household_members` — the couple unit
+- `categories`, `transactions` — carry `scope` ('private' | 'shared')
+- `shopping_lists`, `list_items` — always shared within the household
+- Household create/join happen via the RPCs `create_household()` and `join_household()`.
+
+## Scope rule (important)
+- `scope = 'shared'` → visible to both household members.
+- `scope = 'private'` → visible only to `owner_id`.
+- This is enforced in the DB by RLS. The client must still respect it in the UI
+  (e.g. don't show private totals on shared summary screens).
+
+## Conventions
+- Screens live in `src/app/` using Expo Router file-based routing.
+- Supabase client in `lib/supabase.ts`; generated DB types in `lib/database.types.ts`
+  (regenerate with `pnpm dlx supabase gen types typescript`).
+- Realtime subscriptions live in hooks (e.g. `hooks/useListItems.ts`); always
+  unsubscribe on unmount.
+- Optimistic updates for list add/check/delete; reconcile against Realtime events.
+- `useColorScheme()` for dark mode; apply safe-area insets on every screen.
+- Always handle the three permission states (not asked / denied / granted) and the
+  offline state gracefully (banner + retry).
+- Every list/data screen needs explicit empty, loading, and error states.
+
+## Don'ts
+- Don't eject from the Expo managed workflow.
+- Don't put sensitive data in AsyncStorage — use `expo-secure-store`.
+- Don't hardcode pixel dimensions — use flex layouts.
+- Don't bypass RLS by using the service-role key in the app. The app uses the anon key only.
+- Don't `npm install` anything. pnpm only.
+
+## Workflow with Claude Code
+- Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
+- Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
+- State the Expo SDK version in prompts when touching native/SDK APIs.
+- When changing the schema, update `schema.sql`, run the migration, then regenerate types.
