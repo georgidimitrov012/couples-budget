@@ -1,6 +1,6 @@
-# CLAUDE.md — Couples Budget + Shared Shopping List
+# Couples Budget + Shared Shopping List
 
-This file tells Claude Code how to work in this repo. Read it before generating code.
+Conventions for AI coding agents working in this repo. Read before generating code.
 
 ## What we're building
 A mobile app for couples with two core features:
@@ -11,12 +11,13 @@ A "household" is a couple (max 2 members). One partner creates it; the other joi
 with a 6-character invite code.
 
 ## Stack
-- **Expo** (latest stable SDK) + **Expo Router** (file-based routing), **TypeScript strict**
+- **Expo SDK 57** + **Expo Router** (file-based routing), **TypeScript strict**
 - **Supabase**: Postgres, Auth, Row-Level Security, Realtime (websockets)
 - `expo-secure-store` for tokens/sensitive data
 - Realtime + optimistic UI for the shopping list (no offline sync engine in the MVP)
 - **EAS Build / EAS Submit** for shipping
 - Package manager: **pnpm ONLY**. Never run `npm` or `yarn`. Use `pnpm`, `pnpm dlx`, `pnpm expo …`.
+- `.npmrc` sets `node-linker=hoisted` — required for Metro to resolve pnpm's modules. Don't remove it.
 
 ## The data model (see schema.sql)
 - `profiles` — 1:1 with auth.users
@@ -32,7 +33,7 @@ with a 6-character invite code.
   (e.g. don't show private totals on shared summary screens).
 
 ## Conventions
-- Screens live in `src/app/` using Expo Router file-based routing.
+- Screens live in **`src/app/`** using Expo Router file-based routing.
 - Supabase client in `lib/supabase.ts`; generated DB types in `lib/database.types.ts`
   (regenerate with `pnpm dlx supabase gen types typescript`).
 - Realtime subscriptions live in hooks (e.g. `hooks/useListItems.ts`); always
@@ -49,9 +50,9 @@ with a 6-character invite code.
 - Don't hardcode pixel dimensions — use flex layouts.
 - Don't bypass RLS by using the service-role key in the app. The app uses the anon key only.
 - Don't `npm install` anything. pnpm only.
+- Don't commit `.env`.
 
-## Workflow with Claude Code
+## Workflow
 - Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
 - Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
-- State the Expo SDK version in prompts when touching native/SDK APIs.
 - When changing the schema, update `schema.sql`, run the migration, then regenerate types.
