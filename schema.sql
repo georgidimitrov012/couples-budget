@@ -289,3 +289,5 @@ grant execute on function public.join_household(text)   to authenticated;
 alter publication supabase_realtime add table public.list_items;
 alter publication supabase_realtime add table public.shopping_lists;
 alter publication supabase_realtime add table public.transactions;
+-- Lets the household creator see their partner appear live during onboarding.
+alter publication supabase_realtime add table public.household_members;
