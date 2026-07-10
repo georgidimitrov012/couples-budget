@@ -2,10 +2,23 @@ import { render, screen, userEvent } from '@testing-library/react-native';
 
 const mockUseTransactions = jest.fn();
 const mockUseCategories = jest.fn();
+const mockUseHousehold = jest.fn();
+const mockUseSettleUp = jest.fn();
 jest.mock('../../hooks/useTransactions', () => ({ useTransactions: () => mockUseTransactions() }));
 jest.mock('../../hooks/useCategories', () => ({ useCategories: () => mockUseCategories() }));
+jest.mock('../../hooks/useAuth', () => {
+  const user = { id: 'u1' };
+  return { useAuth: () => ({ user }) };
+});
+jest.mock('../../hooks/useHousehold', () => ({ useHousehold: () => mockUseHousehold() }));
+jest.mock('../../hooks/useSettleUp', () => ({ useSettleUp: () => mockUseSettleUp() }));
 
 import BudgetScreen from '../../src/app/(app)/(tabs)/budget';
+
+const ME = { user_id: 'u1', role: 'owner', joined_at: '', display_name: 'Alex' };
+const PARTNER = { user_id: 'u2', role: 'member', joined_at: '', display_name: 'Maria' };
+const COUPLE = { household: { id: 'h1' }, members: [ME, PARTNER] };
+const SOLO = { household: { id: 'h1' }, members: [ME] };
 
 const FOOD = {
   id: 'c1',
@@ -57,9 +70,23 @@ const base = {
   retry: jest.fn(),
 };
 
+const settleBase = {
+  balance: 0,
+  settlements: [],
+  lastSettledOn: null as string | null,
+  loading: false,
+  error: null as string | null,
+  settling: false,
+  settleUp: jest.fn(),
+  retry: jest.fn(),
+};
+
 beforeEach(() => {
   mockUseTransactions.mockReturnValue({ ...base });
   mockUseCategories.mockReturnValue({ categories: [] });
+  // Solo by default so the settle card doesn't interfere with unrelated tests.
+  mockUseHousehold.mockReturnValue(SOLO);
+  mockUseSettleUp.mockReturnValue({ ...settleBase });
 });
 
 describe('BudgetScreen', () => {
@@ -167,6 +194,46 @@ describe('BudgetScreen', () => {
     expect(screen.getByText(/Network down/)).toBeTruthy();
     await user.press(screen.getByLabelText('Retry'));
     expect(retry).toHaveBeenCalled();
+  });
+
+  it('hides the settle card until the partner has joined', async () => {
+    await render(<BudgetScreen />);
+    expect(screen.queryByTestId('settle-balance')).toBeNull();
+  });
+
+  it('shows who owes whom when the partner owes the user', async () => {
+    mockUseHousehold.mockReturnValue(COUPLE);
+    mockUseSettleUp.mockReturnValue({ ...settleBase, balance: 12 });
+    await render(<BudgetScreen />);
+    expect(screen.getByText('Maria owes you 12.00')).toBeTruthy();
+    expect(screen.getByLabelText('Mark as settled')).toBeTruthy();
+  });
+
+  it('shows who owes whom when the user owes the partner', async () => {
+    mockUseHousehold.mockReturnValue(COUPLE);
+    mockUseSettleUp.mockReturnValue({ ...settleBase, balance: -7.5 });
+    await render(<BudgetScreen />);
+    expect(screen.getByText('You owe Maria 7.50')).toBeTruthy();
+  });
+
+  it('shows all-square (no settle button) with the last settle date', async () => {
+    mockUseHousehold.mockReturnValue(COUPLE);
+    mockUseSettleUp.mockReturnValue({ ...settleBase, balance: 0, lastSettledOn: '2026-07-01' });
+    await render(<BudgetScreen />);
+    expect(screen.getByText("You're all square")).toBeTruthy();
+    expect(screen.getByText(/Last settled 2026-07-01/)).toBeTruthy();
+    expect(screen.queryByLabelText('Mark as settled')).toBeNull();
+  });
+
+  it('records a settlement when "Mark as settled" is pressed', async () => {
+    const settleUp = jest.fn();
+    mockUseHousehold.mockReturnValue(COUPLE);
+    mockUseSettleUp.mockReturnValue({ ...settleBase, balance: 12, settleUp });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.press(screen.getByLabelText('Mark as settled'));
+    expect(settleUp).toHaveBeenCalled();
   });
 
   it('renders a transaction and removes it', async () => {

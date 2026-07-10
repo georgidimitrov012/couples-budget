@@ -18,7 +18,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
+import { useHousehold } from '../../../../hooks/useHousehold';
+import { useSettleUp } from '../../../../hooks/useSettleUp';
 import {
   useTransactions,
   type Transaction,
@@ -38,6 +41,10 @@ export default function BudgetScreen() {
   const theme = useTheme();
   const { items, loading, error, addTransaction, removeTransaction, retry } = useTransactions();
   const { categories } = useCategories();
+  const { user } = useAuth();
+  const { members } = useHousehold();
+  const settle = useSettleUp(items);
+  const partner = members.find((m) => m.user_id !== user?.id) ?? null;
 
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -100,6 +107,17 @@ export default function BudgetScreen() {
             <SummaryCard label="Ours" sublabel="this month" value={oursTotal} />
             <SummaryCard label="Mine" sublabel="this month" value={mineTotal} />
           </View>
+
+          {partner && (
+            <SettleCard
+              partnerName={partner.display_name ?? 'Your partner'}
+              balance={settle.balance}
+              lastSettledOn={settle.lastSettledOn}
+              settling={settle.settling}
+              error={settle.error}
+              onSettle={settle.settleUp}
+            />
+          )}
 
           <ThemedView type="backgroundElement" style={styles.addCard}>
             <View style={styles.amountRow}>
@@ -199,6 +217,67 @@ export default function BudgetScreen() {
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
+    </ThemedView>
+  );
+}
+
+function SettleCard({
+  partnerName,
+  balance,
+  lastSettledOn,
+  settling,
+  error,
+  onSettle,
+}: {
+  partnerName: string;
+  balance: number;
+  lastSettledOn: string | null;
+  settling: boolean;
+  error: string | null;
+  onSettle: () => void;
+}) {
+  const square = Math.round(balance * 100) === 0;
+  const owed = formatAmount(Math.abs(balance));
+  return (
+    <ThemedView type="backgroundElement" style={styles.settleCard}>
+      <View style={styles.settleMain}>
+        <ThemedText testID="settle-balance">
+          {square
+            ? "You're all square"
+            : balance > 0
+              ? `${partnerName} owes you ${owed}`
+              : `You owe ${partnerName} ${owed}`}
+        </ThemedText>
+        {square && lastSettledOn ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            Last settled {lastSettledOn}
+          </ThemedText>
+        ) : null}
+        {error ? (
+          <ThemedText type="small" style={styles.bannerText}>
+            {error}
+          </ThemedText>
+        ) : null}
+      </View>
+      {!square && (
+        <Pressable
+          onPress={onSettle}
+          disabled={settling}
+          accessibilityRole="button"
+          accessibilityLabel="Mark as settled"
+          style={({ pressed }) => [
+            styles.settleButton,
+            { opacity: pressed || settling ? 0.6 : 1 },
+          ]}>
+          {settling ? (
+            <ActivityIndicator color={Accent.onPrimary} />
+          ) : (
+            <ThemedText type="smallBold" style={styles.settleButtonText}>
+              Mark as settled
+            </ThemedText>
+          )}
+        </Pressable>
+      )}
     </ThemedView>
   );
 }
@@ -317,6 +396,25 @@ const styles = StyleSheet.create({
   },
   link: { color: Accent.primary },
   summaryRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.three },
+  settleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    marginBottom: Spacing.three,
+  },
+  settleMain: { flex: 1, gap: Spacing.half },
+  settleButton: {
+    backgroundColor: Accent.primary,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settleButtonText: { color: Accent.onPrimary },
   summaryCard: {
     flex: 1,
     borderRadius: Spacing.three,

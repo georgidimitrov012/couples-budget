@@ -24,7 +24,8 @@ where pubname = 'supabase_realtime'
 order by tablename;
 ```
 
-Expected to include: `household_members`, `list_items`, `shopping_lists`, `transactions`.
+Expected to include: `household_members`, `list_items`, `settlements`, `shopping_lists`,
+`transactions`.
 
 **Add whichever are missing** (adding one that already exists throws
 "already member of publication", so run only the missing lines):
@@ -84,3 +85,44 @@ When pointing the app at a **fresh** Supabase project:
 3. **Client env** — set `EXPO_PUBLIC_SUPABASE_URL` and
    `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env` from Project Settings → API.
 4. **Realtime** — confirm §1 (the publication lines in `schema.sql` cover it, but verify).
+
+---
+
+## 4. Migration: `settlements` (settle-up feature)
+
+Projects provisioned **before** the settle-up feature need this applied once in the SQL
+Editor (fresh projects get it from `schema.sql`). Idempotence note: `create table` /
+`create policy` will error if already applied — that just means you're done.
+
+```sql
+create table public.settlements (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  from_user    uuid not null references auth.users(id),
+  to_user      uuid not null references auth.users(id),
+  amount       numeric(12,2) not null check (amount > 0),
+  created_at   timestamptz not null default now(),
+  check (from_user <> to_user)
+);
+
+alter table public.settlements enable row level security;
+
+create policy "settlements_select" on public.settlements
+  for select using (public.is_household_member(household_id));
+create policy "settlements_insert" on public.settlements
+  for insert with check (
+    public.is_household_member(household_id)
+    and exists (select 1 from public.household_members hm
+                where hm.household_id = settlements.household_id and hm.user_id = from_user)
+    and exists (select 1 from public.household_members hm
+                where hm.household_id = settlements.household_id and hm.user_id = to_user)
+  );
+create policy "settlements_delete" on public.settlements
+  for delete using (public.is_household_member(household_id));
+
+alter publication supabase_realtime add table public.settlements;
+```
+
+**Verify:** `pnpm test:security` — the settlement checks should pass. **Smoke-test:** with
+a shared expense on the books, the Budget tab shows "X owes Y …"; tapping **Mark as
+settled** flips it to "You're all square" on both partners' devices.

@@ -151,6 +151,30 @@ async function main() {
     .insert({ household_id: hh.id, owner_id: b.id, name: 'spoof', scope: 'shared' });
   check('category owner spoofing is rejected (owner_id must equal auth.uid)', catSpoof.error != null, catSpoof.error?.message ?? 'NO ERROR');
 
+  // Settle-up: A records that B paid back 2.50 (half of the shared 5.00).
+  const settleIns = await clientA
+    .from('settlements')
+    .insert({ household_id: hh.id, from_user: b.id, to_user: a.id, amount: 2.5 })
+    .select()
+    .single();
+  check('member (A) can record a settlement between the partners', settleIns.error == null, settleIns.error?.message ?? '');
+
+  const bReadSettle = await clientB.from('settlements').select('id').eq('household_id', hh.id);
+  check('co-member (B) can read settlements', (bReadSettle.data?.length ?? 0) >= 1);
+
+  const cReadSettle = await clientC.from('settlements').select('id').eq('household_id', hh.id);
+  check('outsider (C) cannot read settlements', (cReadSettle.data?.length ?? 0) === 0);
+
+  const cInsertSettle = await clientC
+    .from('settlements')
+    .insert({ household_id: hh.id, from_user: c.id, to_user: a.id, amount: 1 });
+  check('non-member (C) cannot record a settlement', cInsertSettle.error != null, cInsertSettle.error?.message ?? 'NO ERROR');
+
+  const settleOutsider = await clientA
+    .from('settlements')
+    .insert({ household_id: hh.id, from_user: c.id, to_user: a.id, amount: 1 });
+  check('settlement parties must both be household members', settleOutsider.error != null, settleOutsider.error?.message ?? 'NO ERROR');
+
   const fullJoin = await clientC.rpc('join_household', { p_code: hh.invite_code });
   check('cannot join a full (2-member) household', fullJoin.error != null, fullJoin.error?.message ?? 'NO ERROR');
 

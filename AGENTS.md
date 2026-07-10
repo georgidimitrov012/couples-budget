@@ -23,6 +23,7 @@ with a 6-character invite code.
 - `profiles` — 1:1 with auth.users
 - `households` + `household_members` — the couple unit
 - `categories`, `transactions` — carry `scope` ('private' | 'shared')
+- `settlements` — recorded partner-to-partner paybacks for settle-up (shared costs split 50/50)
 - `shopping_lists`, `list_items` — always shared within the household
 - Household create/join happen via the RPCs `create_household()` and `join_household()`.
 
