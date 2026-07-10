@@ -195,4 +195,19 @@ describe('useListItems', () => {
     await unmount();
     expect(mockRemoveChannel).toHaveBeenCalled();
   });
+
+  it('retry() reloads after a failed load and clears the error', async () => {
+    results.select = { data: null, error: { message: 'load failed' } };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('load failed');
+
+    results.select = { data: [row({ id: 'i1' })], error: null };
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items).toHaveLength(1);
+  });
 });

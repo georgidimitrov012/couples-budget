@@ -10,14 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCategories, type Category, type CategoryScope } from '../../../hooks/useCategories';
 
-const PRIMARY = '#3c87f7';
 const CATEGORY_COLORS = [
   '#e5484d',
   '#f76b15',
@@ -116,7 +116,7 @@ export default function CategoriesScreen() {
                   { opacity: pressed || !name.trim() || saving ? 0.6 : 1 },
                 ]}>
                 {saving ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color={Accent.onPrimary} />
                 ) : (
                   <ThemedText style={styles.addButtonText}>Add</ThemedText>
                 )}
@@ -163,42 +163,6 @@ export default function CategoriesScreen() {
         </View>
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-function ScopeToggle({
-  scope,
-  onChange,
-}: {
-  scope: CategoryScope;
-  onChange: (s: CategoryScope) => void;
-}) {
-  const theme = useTheme();
-  const options: { value: CategoryScope; label: string }[] = [
-    { value: 'shared', label: 'Ours' },
-    { value: 'private', label: 'Mine' },
-  ];
-  return (
-    <View style={[styles.toggle, { backgroundColor: theme.background }]}>
-      {options.map((o) => {
-        const active = scope === o.value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={`Scope: ${o.label}`}
-            style={[styles.toggleOption, active && { backgroundColor: PRIMARY }]}>
-            <ThemedText
-              type="smallBold"
-              style={active ? styles.toggleTextActive : { color: theme.textSecondary }}>
-              {o.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </View>
   );
 }
 
@@ -253,7 +217,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
-  close: { color: PRIMARY, fontWeight: '600', fontSize: 16 },
+  close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },
   addCard: {
     borderRadius: Spacing.three,
@@ -271,15 +235,8 @@ const styles = StyleSheet.create({
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   swatch: { width: 32, height: 32, borderRadius: 16 },
   formRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toggle: { flexDirection: 'row', borderRadius: Spacing.two, padding: 2 },
-  toggleOption: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two - 2,
-  },
-  toggleTextActive: { color: '#ffffff' },
   addButton: {
-    backgroundColor: PRIMARY,
+    backgroundColor: Accent.primary,
     borderRadius: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
@@ -287,8 +244,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
-  errorText: { color: '#e5484d' },
+  addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
+  errorText: { color: Accent.danger },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
   listContent: { gap: Spacing.two, paddingVertical: Spacing.one },

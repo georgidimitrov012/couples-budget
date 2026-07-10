@@ -21,7 +21,7 @@ jest.mock('../../hooks/useHousehold', () => {
   return { useHousehold: () => ({ household }) };
 });
 
-import { useTransactions } from '../../hooks/useTransactions';
+import { localDateString, useTransactions } from '../../hooks/useTransactions';
 
 type Result = { data?: unknown; error: unknown };
 const results: { select: Result; insert: Result; delete: Result } = {
@@ -82,6 +82,13 @@ beforeEach(() => {
     });
     ch.subscribe = jest.fn(() => ch);
     return ch;
+  });
+});
+
+describe('localDateString', () => {
+  it('formats the local calendar date with zero padding', () => {
+    expect(localDateString(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(localDateString(new Date(2026, 11, 31, 23, 59))).toBe('2026-12-31');
   });
 });
 
@@ -177,5 +184,39 @@ describe('useTransactions', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await unmount();
     expect(mockRemoveChannel).toHaveBeenCalled();
+  });
+
+  it('retry() reloads after a failed load and clears the error', async () => {
+    results.select = { data: null, error: { message: 'load failed' } };
+    const { result } = await renderHook(() => useTransactions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('load failed');
+
+    results.select = { data: [tx({ id: 't1' })], error: null };
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items.map((t) => t.id)).toEqual(['t1']);
+  });
+
+  // Regression: occurred_on must be the local calendar date. toISOString() gives
+  // the UTC date, which at 00:30 local (east of UTC) is still "yesterday" — the
+  // expense would show dated a day early and could fall out of "this month".
+  it('defaults occurred_on to the local date, not the UTC date', async () => {
+    results.insert = { data: tx({ id: 'real1' }), error: null };
+    const { result } = await renderHook(() => useTransactions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    jest.useFakeTimers({ now: new Date(2026, 6, 15, 0, 30) }); // July 15, 00:30 local
+    try {
+      await act(async () => {
+        await result.current.addTransaction({ amount: 5, scope: 'shared' });
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(insertSpy).toHaveBeenCalledWith(expect.objectContaining({ occurred_on: '2026-07-15' }));
   });
 });

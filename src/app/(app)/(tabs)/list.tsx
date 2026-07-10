@@ -13,16 +13,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useShoppingList } from '../../../../hooks/useShoppingList';
 
-const PRIMARY = '#3c87f7';
-
 export default function ListScreen() {
   const theme = useTheme();
-  const { listId, loading: listLoading, error: listError, retry } = useShoppingList();
+  const { listId, loading: listLoading, error: listError, retry: retryList } = useShoppingList();
   const {
     items,
     loading: itemsLoading,
@@ -31,6 +29,7 @@ export default function ListScreen() {
     toggleItem,
     removeItem,
     clearChecked,
+    retry: retryItems,
   } = useListItems(listId);
   const [draft, setDraft] = useState('');
 
@@ -44,6 +43,12 @@ export default function ListScreen() {
     const name = draft.trim();
     setDraft('');
     await addItem(name);
+  }
+
+  // A load error can live in either hook (resolving the list vs. its items).
+  function handleRetry() {
+    retryList();
+    retryItems();
   }
 
   return (
@@ -68,7 +73,7 @@ export default function ListScreen() {
 
           {error && (
             <Pressable
-              onPress={retry}
+              onPress={handleRetry}
               accessibilityRole="button"
               accessibilityLabel="Retry"
               style={({ pressed }) => pressed && styles.pressed}>
@@ -216,7 +221,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     marginBottom: Spacing.two,
   },
-  bannerText: { color: '#e5484d' },
+  bannerText: { color: Accent.danger },
   addRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
   input: {
     flex: 1,
@@ -227,13 +232,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addButton: {
-    backgroundColor: PRIMARY,
+    backgroundColor: Accent.primary,
     borderRadius: Spacing.three,
     paddingHorizontal: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
+  addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
   listContent: { gap: Spacing.two, paddingVertical: Spacing.one },
@@ -254,8 +259,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  checkmark: { color: '#ffffff', fontSize: 14, fontWeight: '700', lineHeight: 16 },
+  checkboxChecked: { backgroundColor: Accent.primary, borderColor: Accent.primary },
+  checkmark: { color: Accent.onPrimary, fontSize: 14, fontWeight: '700', lineHeight: 16 },
   itemName: { flex: 1, fontSize: 16 },
   itemNameChecked: { textDecorationLine: 'line-through' },
   remove: { paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },

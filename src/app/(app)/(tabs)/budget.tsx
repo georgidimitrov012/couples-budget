@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
 import {
@@ -23,8 +24,6 @@ import {
   type Transaction,
   type TransactionScope,
 } from '../../../../hooks/useTransactions';
-
-const PRIMARY = '#3c87f7';
 
 function currentMonthKey(): string {
   const now = new Date();
@@ -37,7 +36,7 @@ function formatAmount(n: number): string {
 
 export default function BudgetScreen() {
   const theme = useTheme();
-  const { items, loading, error, addTransaction, removeTransaction } = useTransactions();
+  const { items, loading, error, addTransaction, removeTransaction, retry } = useTransactions();
   const { categories } = useCategories();
 
   const [amount, setAmount] = useState('');
@@ -161,11 +160,17 @@ export default function BudgetScreen() {
           </ThemedView>
 
           {error && (
-            <ThemedView type="backgroundElement" style={styles.banner}>
-              <ThemedText type="small" style={styles.bannerText}>
-                {error}
-              </ThemedText>
-            </ThemedView>
+            <Pressable
+              onPress={retry}
+              accessibilityRole="button"
+              accessibilityLabel="Retry"
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.banner}>
+                <ThemedText type="small" style={styles.bannerText}>
+                  {error} — tap to retry
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
           )}
 
           {loading ? (
@@ -214,42 +219,6 @@ function SummaryCard({ label, sublabel, value }: { label: string; sublabel: stri
   );
 }
 
-function ScopeToggle({
-  scope,
-  onChange,
-}: {
-  scope: TransactionScope;
-  onChange: (s: TransactionScope) => void;
-}) {
-  const theme = useTheme();
-  const options: { value: TransactionScope; label: string }[] = [
-    { value: 'shared', label: 'Ours' },
-    { value: 'private', label: 'Mine' },
-  ];
-  return (
-    <View style={[styles.toggle, { backgroundColor: theme.background }]}>
-      {options.map((o) => {
-        const active = scope === o.value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={`Scope: ${o.label}`}
-            style={[styles.toggleOption, active && { backgroundColor: PRIMARY }]}>
-            <ThemedText
-              type="smallBold"
-              style={active ? styles.toggleTextActive : { color: theme.textSecondary }}>
-              {o.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 function CategoryChip({
   label,
   color,
@@ -271,7 +240,7 @@ function CategoryChip({
       style={[
         styles.chip,
         { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
-        active && { borderColor: PRIMARY },
+        active && { borderColor: Accent.primary },
       ]}>
       {color ? <View style={[styles.chipDot, { backgroundColor: color }]} /> : null}
       <ThemedText type="small" themeColor={active ? 'text' : 'textSecondary'}>
@@ -346,7 +315,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
-  link: { color: '#3c87f7' },
+  link: { color: Accent.primary },
   summaryRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.three },
   summaryCard: {
     flex: 1,
@@ -377,13 +346,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     fontSize: 16,
   },
-  toggle: { flexDirection: 'row', borderRadius: Spacing.two, padding: 2 },
-  toggleOption: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two - 2,
-  },
-  toggleTextActive: { color: '#ffffff' },
   chipRow: { gap: Spacing.two, paddingVertical: Spacing.one },
   chip: {
     flexDirection: 'row',
@@ -396,20 +358,20 @@ const styles = StyleSheet.create({
   },
   chipDot: { width: 10, height: 10, borderRadius: 5 },
   addButton: {
-    backgroundColor: PRIMARY,
+    backgroundColor: Accent.primary,
     borderRadius: Spacing.two,
     paddingVertical: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
+  addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
   banner: {
     borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     marginBottom: Spacing.two,
   },
-  bannerText: { color: '#e5484d' },
+  bannerText: { color: Accent.danger },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
   listContent: { gap: Spacing.two, paddingVertical: Spacing.one },

@@ -18,6 +18,15 @@ export type Transaction = {
   created_at: string;
 };
 
+// occurred_on is a calendar date in the user's local timezone. toISOString()
+// would give the UTC date, which shifts late-evening entries to the previous
+// day (and into the previous month right at a month boundary).
+export function localDateString(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`;
+}
+
 // Newest first: by the day it happened, then by insert time as a tiebreak.
 function sortTx(list: Transaction[]): Transaction[] {
   return [...list].sort(
@@ -58,6 +67,7 @@ export function useTransactions() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0); // bumped by retry()
 
   // Initial load
   useEffect(() => {
@@ -83,7 +93,7 @@ export function useTransactions() {
     return () => {
       active = false;
     };
-  }, [householdId]);
+  }, [householdId, attempt]);
 
   // Realtime
   useEffect(() => {
@@ -126,7 +136,7 @@ export function useTransactions() {
 
       const tempId = `temp-${Date.now()}`;
       const now = new Date().toISOString();
-      const occurred = input.occurredOn ?? now.slice(0, 10);
+      const occurred = input.occurredOn ?? localDateString();
 
       const optimistic: Transaction = {
         id: tempId,
@@ -175,5 +185,8 @@ export function useTransactions() {
     }
   }, []);
 
-  return { items, loading, error, addTransaction, removeTransaction };
+  // Re-runs the initial load, which also clears a stuck error (load or mutation).
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  return { items, loading, error, addTransaction, removeTransaction, retry };
 }

@@ -54,6 +54,7 @@ const base = {
   error: null as string | null,
   addTransaction: jest.fn(),
   removeTransaction: jest.fn(),
+  retry: jest.fn(),
 };
 
 beforeEach(() => {
@@ -155,6 +156,17 @@ describe('BudgetScreen', () => {
     expect(screen.getByText('Lunch')).toBeTruthy();
     // "Food" appears both in the picker chip and on the row.
     expect(screen.getAllByText('Food').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows an error banner and retries on tap', async () => {
+    const retry = jest.fn();
+    mockUseTransactions.mockReturnValue({ ...base, error: 'Network down', retry });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    expect(screen.getByText(/Network down/)).toBeTruthy();
+    await user.press(screen.getByLabelText('Retry'));
+    expect(retry).toHaveBeenCalled();
   });
 
   it('renders a transaction and removes it', async () => {

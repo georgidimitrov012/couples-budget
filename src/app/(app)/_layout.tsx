@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Accent, Spacing } from '@/constants/theme';
 import { CategoriesProvider } from '../../../hooks/useCategories';
 import { HouseholdProvider, useHousehold } from '../../../hooks/useHousehold';
 
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.four,
   },
-  error: { color: '#e5484d', textAlign: 'center' },
+  error: { color: Accent.danger, textAlign: 'center' },
   retry: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.four },
-  retryText: { color: '#3c87f7', fontWeight: '600' },
+  retryText: { color: Accent.primary, fontWeight: '600' },
 });

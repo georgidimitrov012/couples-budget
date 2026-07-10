@@ -37,6 +37,7 @@ const noopItems = {
   toggleItem: jest.fn(),
   removeItem: jest.fn(),
   clearChecked: jest.fn(),
+  retry: jest.fn(),
 };
 
 beforeEach(() => {
@@ -115,14 +116,33 @@ describe('ListScreen', () => {
     expect(clearChecked).toHaveBeenCalled();
   });
 
-  it('shows an error banner and retries on tap', async () => {
-    const retry = jest.fn();
-    mockUseShoppingList.mockReturnValue({ listId: 'L1', loading: false, error: 'Network down', retry });
+  it('shows an error banner and retries both hooks on tap', async () => {
+    const listRetry = jest.fn();
+    const itemsRetry = jest.fn();
+    mockUseShoppingList.mockReturnValue({
+      listId: 'L1',
+      loading: false,
+      error: 'Network down',
+      retry: listRetry,
+    });
+    mockUseListItems.mockReturnValue({ ...noopItems, retry: itemsRetry });
     const user = userEvent.setup();
     await render(<ListScreen />);
 
     expect(screen.getByText(/Network down/)).toBeTruthy();
     await user.press(screen.getByLabelText('Retry'));
-    expect(retry).toHaveBeenCalled();
+    expect(listRetry).toHaveBeenCalled();
+    expect(itemsRetry).toHaveBeenCalled();
+  });
+
+  it('a stuck item-mutation error is also retryable from the banner', async () => {
+    const itemsRetry = jest.fn();
+    mockUseListItems.mockReturnValue({ ...noopItems, error: 'insert denied', retry: itemsRetry });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    expect(screen.getByText(/insert denied/)).toBeTruthy();
+    await user.press(screen.getByLabelText('Retry'));
+    expect(itemsRetry).toHaveBeenCalled();
   });
 });

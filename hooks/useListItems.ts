@@ -35,6 +35,7 @@ export function useListItems(listId: string | null) {
   const [items, setItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0); // bumped by retry()
   const userIdRef = useRef<string | null>(null);
 
   // Initial load
@@ -63,7 +64,7 @@ export function useListItems(listId: string | null) {
     return () => {
       active = false;
     };
-  }, [listId]);
+  }, [listId, attempt]);
 
   // Realtime subscription
   useEffect(() => {
@@ -179,7 +180,10 @@ export function useListItems(listId: string | null) {
     }
   }, [listId, items]);
 
-  return { items, loading, error, addItem, toggleItem, removeItem, clearChecked };
+  // Re-runs the initial load, which also clears a stuck error (load or mutation).
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  return { items, loading, error, addItem, toggleItem, removeItem, clearChecked, retry };
 }
 
 // Extension idea (Phase 4 "partner is editing" indicator): add a second hook that

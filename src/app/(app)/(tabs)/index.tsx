@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { Accent, BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useHousehold } from '../../../../hooks/useHousehold';
@@ -100,5 +100,5 @@ const styles = StyleSheet.create({
   code: { fontSize: 40, fontWeight: '800', letterSpacing: 6 },
   waitingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   signOut: { paddingVertical: Spacing.three, alignItems: 'center', justifyContent: 'center' },
-  signOutText: { color: '#3c87f7', fontWeight: '600', fontSize: 16 },
+  signOutText: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
 });
