@@ -105,6 +105,12 @@ async function main() {
   const cReadMembers = await clientC.from('household_members').select('user_id').eq('household_id', hh.id);
   check('outsider (C) cannot read household members', (cReadMembers.data?.length ?? 0) === 0);
 
+  const cReadList = await clientC.from('shopping_lists').select('id').eq('id', list.id);
+  check('outsider (C) cannot read the shopping list', (cReadList.data?.length ?? 0) === 0);
+
+  const cInsertList = await clientC.from('shopping_lists').insert({ household_id: hh.id, name: 'sneaky list' });
+  check('non-member (C) cannot create a list in the household', cInsertList.error != null, cInsertList.error?.message ?? 'NO ERROR');
+
   const cInsert = await clientC.from('list_items').insert({ list_id: list.id, name: 'sneaky', added_by: c.id });
   check('non-member (C) cannot insert into the list', cInsert.error != null, cInsert.error?.message ?? 'NO ERROR');
 

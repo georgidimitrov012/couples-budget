@@ -13,8 +13,11 @@ describe('route structure', () => {
     expect(files).not.toContain('index.tsx');
   });
 
-  it('the tabs group owns the index (/) route', () => {
+  it('the tabs group owns the index (/) route and the shopping list', () => {
     const files = fs.readdirSync(path.join(appDir, '(tabs)'));
     expect(files).toContain('index.tsx');
+    expect(files).toContain('list.tsx');
+    // The template Explore tab was replaced by the shopping list.
+    expect(files).not.toContain('explore.tsx');
   });
 });
