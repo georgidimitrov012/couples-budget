@@ -56,6 +56,8 @@ with a 6-character invite code.
 - Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
 - Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
 - When changing the schema, update `schema.sql`, run the migration, then regenerate types.
+- Dashboard / ops steps (realtime publication, the test-only service-role key, email
+  confirmation, fresh-project provisioning) live in `docs/SUPABASE_SETUP.md`.
 
 ## Testing (project rule)
 - Two suites: **`pnpm test`** — deterministic Jest unit/component/regression tests
