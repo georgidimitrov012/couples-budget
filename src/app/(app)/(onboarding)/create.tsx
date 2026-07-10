@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useHousehold } from '../../../../hooks/useHousehold';
 
@@ -82,7 +82,7 @@ export default function CreateHouseholdScreen() {
               disabled={loading}
               style={({ pressed }) => [styles.button, { opacity: pressed || loading ? 0.7 : 1 }]}>
               {loading ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={Accent.onPrimary} />
               ) : (
                 <ThemedText style={styles.buttonText}>Create household</ThemedText>
               )}
@@ -115,14 +115,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     fontSize: 16,
   },
-  error: { color: '#e5484d' },
+  error: { color: Accent.danger },
   button: {
-    backgroundColor: '#3c87f7',
+    backgroundColor: Accent.primary,
     borderRadius: Spacing.three,
     paddingVertical: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
+  buttonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
   back: { alignItems: 'center', paddingVertical: Spacing.two },
 });

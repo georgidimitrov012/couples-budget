@@ -26,6 +26,13 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+// Scheme-independent accents (buttons, links, errors) — same in light and dark.
+export const Accent = {
+  primary: '#3c87f7',
+  onPrimary: '#ffffff',
+  danger: '#e5484d',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

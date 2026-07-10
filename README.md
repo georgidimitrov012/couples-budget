@@ -1,56 +1,80 @@
-# Welcome to your Expo app 👋
+# Couples Budget + Shared Shopping List
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile app for couples: a shared budget with a **"Yours / Mine / Ours"** model and a
+**real-time shared shopping list** that updates live on both partners' phones.
 
-## Get started
+A *household* is a couple (max 2 members). One partner creates it; the other joins with a
+6-character invite code.
 
-1. Install dependencies
+## How "Yours / Mine / Ours" works
+
+Every transaction and category has a `scope`:
+
+- `shared` ("Ours") — visible to both partners.
+- `private` ("Mine") — visible only to its owner. Your partner's private spending ("Yours")
+  is never sent to your device: Postgres Row-Level Security filters it out server-side, and
+  the client defensively re-applies the same rule to realtime events.
+
+The shopping list is always shared within the household.
+
+## Stack
+
+- [Expo SDK 57](https://docs.expo.dev) + Expo Router (file-based routing), TypeScript strict
+- [Supabase](https://supabase.com): Postgres, Auth, Row-Level Security, Realtime
+- `expo-secure-store` (keychain) for the session token — never AsyncStorage
+- Optimistic UI reconciled against Realtime events (no offline sync engine in the MVP)
+- EAS Build / EAS Submit for shipping
+
+## Getting started
+
+Package manager is **pnpm only** (`.npmrc` uses `node-linker=hoisted` so Metro can resolve
+pnpm's modules — don't remove it).
+
+1. Install dependencies:
 
    ```bash
-   npm install
+   pnpm install
    ```
 
-2. Start the app
+2. Create a Supabase project and apply `schema.sql` (tables, RLS policies, RPCs, realtime
+   publication). Full provisioning steps live in [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
+
+3. Configure the environment:
 
    ```bash
-   npx expo start
+   cp .env.example .env   # then fill in your Supabase URL + publishable/anon key
    ```
 
-In the output, you'll find options to open the app in a
+   The app uses the anon key only; RLS is the security boundary. The optional
+   `SUPABASE_SERVICE_ROLE_KEY` is used exclusively by the security test suite.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+4. Run it:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+   ```bash
+   pnpm start        # Expo dev server (press i / a / w)
+   ```
 
-## Get a fresh project
+## Testing
 
-When you're ready, run:
+| Command | What it runs |
+| --- | --- |
+| `pnpm test` | Deterministic Jest suite (units, hooks, screens, regressions) — no network |
+| `pnpm test:security` | Live RLS/penetration suite against the real Supabase project |
+| `pnpm test:all` | Both — **required before every merge to `main`** |
 
-```bash
-npm run reset-project
+The security suite self-cleans its test users/households when `SUPABASE_SERVICE_ROLE_KEY`
+is set in `.env`; without it, it runs in anon-fallback mode and prints leftovers to delete.
+
+## Project layout
+
+```
+src/app/            Expo Router routes: (auth) sign-in/up, (app) → (onboarding) + (tabs)
+src/components/     Shared UI (themed primitives, tab bars, scope toggle)
+hooks/              Data hooks: auth, household, shopping list, transactions, categories
+lib/                Supabase client + secure-storage adapter
+schema.sql          Full database schema (tables, RLS, RPCs, realtime publication)
+docs/               Supabase dashboard/ops runbook
+__tests__/          Deterministic Jest suite     tests/security/  live RLS suite
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Conventions for contributors (and AI agents) are in [AGENTS.md](AGENTS.md).

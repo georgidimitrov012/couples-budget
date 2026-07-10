@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Accent, Spacing } from '@/constants/theme';
 import { supabase } from '../../../../lib/supabase';
 
 export default function WelcomeScreen() {
@@ -52,13 +52,13 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   actions: { gap: Spacing.three, paddingBottom: Spacing.four },
   primary: {
-    backgroundColor: '#3c87f7',
+    backgroundColor: Accent.primary,
     borderRadius: Spacing.three,
     paddingVertical: Spacing.three,
     alignItems: 'center',
   },
-  primaryText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
+  primaryText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
   secondary: { paddingVertical: Spacing.three, alignItems: 'center' },
-  secondaryText: { color: '#3c87f7', fontWeight: '600', fontSize: 16 },
+  secondaryText: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   signOut: { alignItems: 'center', paddingVertical: Spacing.two },
 });

@@ -118,6 +118,23 @@ create table public.transactions (
 );
 
 -- ----------------------------------------------------------------
+-- settlements ("who owes whom" settle-up)
+-- Shared expenses are split 50/50; whoever paid is owed half by their
+-- partner. A settlement records a payback (from_user paid to_user) and
+-- cancels that debt. Insert-only from the app; no scope column — always
+-- visible to both members.
+-- ----------------------------------------------------------------
+create table public.settlements (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  from_user    uuid not null references auth.users(id),
+  to_user      uuid not null references auth.users(id),
+  amount       numeric(12,2) not null check (amount > 0),
+  created_at   timestamptz not null default now(),
+  check (from_user <> to_user)
+);
+
+-- ----------------------------------------------------------------
 -- shopping lists (always shared within a household)
 -- ----------------------------------------------------------------
 create table public.shopping_lists (
@@ -153,6 +170,15 @@ create trigger list_items_touch
   before update on public.list_items
   for each row execute function public.touch_updated_at();
 
+-- Budget wiring: checking off a priced list item records a shared transaction.
+-- The link column lives on transactions but is added here because list_items is
+-- created after transactions. Unique (partial) so an item can never feed the
+-- budget twice, even if both partners check it simultaneously.
+alter table public.transactions
+  add column list_item_id uuid references public.list_items(id) on delete set null;
+create unique index transactions_list_item_uniq
+  on public.transactions (list_item_id) where list_item_id is not null;
+
 -- Now that shopping_lists exists, define the list access helper.
 create or replace function public.can_access_list(p_list_id uuid)
 returns boolean language sql security definer stable set search_path = public as $$
@@ -172,6 +198,7 @@ alter table public.households         enable row level security;
 alter table public.household_members  enable row level security;
 alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
+alter table public.settlements        enable row level security;
 alter table public.shopping_lists     enable row level security;
 alter table public.list_items         enable row level security;
 
@@ -212,8 +239,29 @@ create policy "transactions_insert" on public.transactions
   for insert with check (public.is_household_member(household_id) and owner_id = auth.uid());
 create policy "transactions_update" on public.transactions
   for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+-- Either partner may delete a shared expense (e.g. unchecking a list item the
+-- other partner checked); private stays owner-only.
 create policy "transactions_delete" on public.transactions
-  for delete using (owner_id = auth.uid());
+  for delete using (
+    owner_id = auth.uid()
+    or (scope = 'shared' and public.is_household_member(household_id))
+  );
+
+-- settlements: visible to both members; either member may record one (a payback
+-- is agreed between partners), but both parties must belong to that household.
+-- Members may delete (undo a mis-recorded settlement).
+create policy "settlements_select" on public.settlements
+  for select using (public.is_household_member(household_id));
+create policy "settlements_insert" on public.settlements
+  for insert with check (
+    public.is_household_member(household_id)
+    and exists (select 1 from public.household_members hm
+                where hm.household_id = settlements.household_id and hm.user_id = from_user)
+    and exists (select 1 from public.household_members hm
+                where hm.household_id = settlements.household_id and hm.user_id = to_user)
+  );
+create policy "settlements_delete" on public.settlements
+  for delete using (public.is_household_member(household_id));
 
 -- shopping_lists: any household member (shared)
 create policy "lists_select" on public.shopping_lists
@@ -292,5 +340,6 @@ grant execute on function public.join_household(text)   to authenticated;
 alter publication supabase_realtime add table public.list_items;
 alter publication supabase_realtime add table public.shopping_lists;
 alter publication supabase_realtime add table public.transactions;
+alter publication supabase_realtime add table public.settlements;
 -- Lets the household creator see their partner appear live during onboarding.
 alter publication supabase_realtime add table public.household_members;
