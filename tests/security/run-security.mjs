@@ -175,6 +175,32 @@ async function main() {
     .insert({ household_id: hh.id, from_user: c.id, to_user: a.id, amount: 1 });
   check('settlement parties must both be household members', settleOutsider.error != null, settleOutsider.error?.message ?? 'NO ERROR');
 
+  // List → budget wiring: a priced item feeds the budget exactly once.
+  const { data: pricedItem } = await clientA
+    .from('list_items')
+    .insert({ list_id: list.id, name: 'Milk', price: 3.5, added_by: a.id })
+    .select()
+    .single();
+  const linkTx = await clientA
+    .from('transactions')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 3.5, description: 'Milk', scope: 'shared', list_item_id: pricedItem.id })
+    .select()
+    .single();
+  check('checking off a priced item can record a linked transaction', linkTx.error == null, linkTx.error?.message ?? '');
+
+  const dupTx = await clientB
+    .from('transactions')
+    .insert({ household_id: hh.id, owner_id: b.id, amount: 3.5, description: 'Milk', scope: 'shared', list_item_id: pricedItem.id });
+  check('an item cannot feed the budget twice (unique link)', dupTx.error != null, dupTx.error?.message ?? 'NO ERROR');
+
+  // Widened delete policy: shared expenses are deletable by either partner
+  // (unchecking an item the other partner checked); private stays owner-only.
+  const bDelShared = await clientB.from('transactions').delete().eq('id', sharedTx.id).select();
+  check("co-member (B) can delete A's shared transaction", (bDelShared.data?.length ?? 0) === 1, bDelShared.error?.message ?? '');
+
+  const bDelPriv = await clientB.from('transactions').delete().eq('id', privTx.id).select();
+  check("co-member (B) cannot delete A's private transaction", (bDelPriv.data?.length ?? 0) === 0);
+
   const fullJoin = await clientC.rpc('join_household', { p_code: hh.invite_code });
   check('cannot join a full (2-member) household', fullJoin.error != null, fullJoin.error?.message ?? 'NO ERROR');
 

@@ -3,36 +3,54 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 const mockFrom = jest.fn();
 const mockChannel = jest.fn();
 const mockRemoveChannel = jest.fn();
-const mockGetSession = jest.fn();
+const txInsertSpy = jest.fn();
+const txDeleteEqSpy = jest.fn();
 
 jest.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => mockFrom(...a),
     channel: (...a: unknown[]) => mockChannel(...a),
     removeChannel: (...a: unknown[]) => mockRemoveChannel(...a),
-    auth: { getSession: (...a: unknown[]) => mockGetSession(...a) },
   },
 }));
+jest.mock('../../hooks/useAuth', () => {
+  const user = { id: 'u1' };
+  return { useAuth: () => ({ user }) };
+});
+jest.mock('../../hooks/useHousehold', () => {
+  const household = { id: 'h1' };
+  return { useHousehold: () => ({ household }) };
+});
 
 import { useListItems } from '../../hooks/useListItems';
 
 type Result = { data?: unknown; error: unknown };
-const results: { select: Result; insert: Result; update: Result; delete: Result } = {
+const results: {
+  select: Result;
+  insert: Result;
+  update: Result;
+  delete: Result;
+  txInsert: Result;
+  txDelete: Result;
+} = {
   select: { data: [], error: null },
   insert: { data: null, error: null },
   update: { error: null },
   delete: { error: null },
+  txInsert: { error: null },
+  txDelete: { error: null },
 };
 
-// Chainable builder: insert/update/delete flag the op; the load path (select →
-// eq → order) and the mutation paths (update/delete → eq) are awaited (thenable),
-// while insert terminates in .single().
-function makeChain() {
+// Chainable builder, table-aware: list_items follows the load/mutation paths
+// (insert terminates in .single(), the rest are awaited thenables); the
+// transactions table (budget wiring) is a plain awaited insert / delete().eq().
+function makeChain(table: string) {
   const chain: Record<string, unknown> = {};
   let op: 'select' | 'insert' | 'update' | 'delete' = 'select';
   chain.select = jest.fn(() => chain);
-  chain.insert = jest.fn(() => {
+  chain.insert = jest.fn((...a: unknown[]) => {
     op = 'insert';
+    if (table === 'transactions') txInsertSpy(...a);
     return chain;
   });
   chain.update = jest.fn(() => {
@@ -43,13 +61,25 @@ function makeChain() {
     op = 'delete';
     return chain;
   });
-  chain.eq = jest.fn(() => chain);
+  chain.eq = jest.fn((...a: unknown[]) => {
+    if (table === 'transactions' && op === 'delete') txDeleteEqSpy(...a);
+    return chain;
+  });
   chain.order = jest.fn(() => chain);
   chain.single = jest.fn(() => Promise.resolve(results.insert));
-  chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-    Promise.resolve(
-      op === 'update' ? results.update : op === 'delete' ? results.delete : results.select
-    ).then(res, rej);
+  chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => {
+    const r =
+      table === 'transactions'
+        ? op === 'delete'
+          ? results.txDelete
+          : results.txInsert
+        : op === 'update'
+          ? results.update
+          : op === 'delete'
+            ? results.delete
+            : results.select;
+    return Promise.resolve(r).then(res, rej);
+  };
   return chain;
 }
 
@@ -77,8 +107,11 @@ beforeEach(() => {
   results.insert = { data: null, error: null };
   results.update = { error: null };
   results.delete = { error: null };
-  mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-  mockFrom.mockImplementation(() => makeChain());
+  results.txInsert = { error: null };
+  results.txDelete = { error: null };
+  txInsertSpy.mockClear();
+  txDeleteEqSpy.mockClear();
+  mockFrom.mockImplementation((table: string) => makeChain(table));
   mockChannel.mockImplementation(() => {
     const ch: Record<string, unknown> = {};
     ch.on = jest.fn((_e: unknown, _f: unknown, handler: (p: unknown) => void) => {
@@ -144,6 +177,79 @@ describe('useListItems', () => {
     });
     expect(result.current.items[0].is_checked).toBe(true);
     expect(result.current.items[0].checked_by).toBe('u1');
+  });
+
+  it('does not touch the budget when toggling an unpriced item', async () => {
+    results.select = { data: [row({ id: 'i1', price: null })], error: null };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleItem(result.current.items[0]);
+    });
+    expect(txInsertSpy).not.toHaveBeenCalled();
+  });
+
+  it('checking a priced item records a shared transaction owned by the checker', async () => {
+    results.select = { data: [row({ id: 'i1', name: 'Milk', price: 3.5 })], error: null };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleItem(result.current.items[0]);
+    });
+    expect(txInsertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        household_id: 'h1',
+        owner_id: 'u1',
+        amount: 3.5,
+        description: 'Milk',
+        scope: 'shared',
+        list_item_id: 'i1',
+      })
+    );
+    expect(result.current.error).toBeNull();
+  });
+
+  it('unchecking a priced item removes its linked transaction', async () => {
+    results.select = {
+      data: [row({ id: 'i1', price: 3.5, is_checked: true, checked_by: 'u1' })],
+      error: null,
+    };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleItem(result.current.items[0]);
+    });
+    expect(txInsertSpy).not.toHaveBeenCalled();
+    expect(txDeleteEqSpy).toHaveBeenCalledWith('list_item_id', 'i1');
+  });
+
+  it('swallows a duplicate budget insert (the partner already checked it)', async () => {
+    results.select = { data: [row({ id: 'i1', price: 2 })], error: null };
+    results.txInsert = { error: { code: '23505', message: 'duplicate key value' } };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleItem(result.current.items[0]);
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.items[0].is_checked).toBe(true); // the check itself stands
+  });
+
+  it('surfaces a budget insert failure without reverting the check', async () => {
+    results.select = { data: [row({ id: 'i1', price: 2 })], error: null };
+    results.txInsert = { error: { code: '42501', message: 'denied' } };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleItem(result.current.items[0]);
+    });
+    expect(result.current.error).toMatch(/couldn't add it to the budget/i);
+    expect(result.current.items[0].is_checked).toBe(true);
   });
 
   it('removes an item', async () => {

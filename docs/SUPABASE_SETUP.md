@@ -126,3 +126,35 @@ alter publication supabase_realtime add table public.settlements;
 **Verify:** `pnpm test:security` — the settlement checks should pass. **Smoke-test:** with
 a shared expense on the books, the Budget tab shows "X owes Y …"; tapping **Mark as
 settled** flips it to "You're all square" on both partners' devices.
+
+---
+
+## 5. Migration: list → budget price wiring
+
+Checking off a priced list item records a shared transaction (owned by whoever checked
+it, so it feeds settle-up); unchecking removes it. Projects provisioned **before** this
+feature need the following applied once in the SQL Editor (fresh projects get it from
+`schema.sql`).
+
+```sql
+-- Link a transaction to the list item that produced it. Unique (partial) so an
+-- item can never feed the budget twice, even if both partners check it at once.
+alter table public.transactions
+  add column list_item_id uuid references public.list_items(id) on delete set null;
+create unique index transactions_list_item_uniq
+  on public.transactions (list_item_id) where list_item_id is not null;
+
+-- Either partner may delete a shared expense (e.g. unchecking a list item the
+-- other partner checked); private stays owner-only. Also fixes the silent no-op
+-- when deleting the partner's shared expense from the Budget tab.
+drop policy "transactions_delete" on public.transactions;
+create policy "transactions_delete" on public.transactions
+  for delete using (
+    owner_id = auth.uid()
+    or (scope = 'shared' and public.is_household_member(household_id))
+  );
+```
+
+**Verify:** `pnpm test:security` — the list→budget wiring checks should pass.
+**Smoke-test:** add a list item with a price, check it off → it appears as an "Ours"
+expense on the Budget tab (and moves the settle-up balance); uncheck → it disappears.

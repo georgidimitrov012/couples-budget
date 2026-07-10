@@ -56,6 +56,7 @@ function tx(over: Partial<Transaction> = {}): Transaction {
     id: `t-${Math.random()}`,
     household_id: 'h1',
     category_id: null,
+    list_item_id: null,
     owner_id: 'u1',
     amount: 10,
     description: null,

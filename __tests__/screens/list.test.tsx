@@ -14,6 +14,7 @@ type Item = {
   list_id: string;
   name: string;
   quantity: number;
+  price: number | null;
   is_checked: boolean;
   added_by: string;
 };
@@ -23,6 +24,7 @@ function item(over: Partial<Item> = {}): Item {
     list_id: 'L1',
     name: 'Milk',
     quantity: 1,
+    price: null,
     is_checked: false,
     added_by: 'u1',
     ...over,
@@ -82,6 +84,27 @@ describe('ListScreen', () => {
     await user.type(screen.getByPlaceholderText('Add an item…'), 'Bread');
     await user.press(screen.getByLabelText('Add item'));
     expect(addItem).toHaveBeenCalledWith('Bread');
+  });
+
+  it('adds an item with a price (feeds the budget on check-off)', async () => {
+    const addItem = jest.fn().mockResolvedValue(undefined);
+    mockUseListItems.mockReturnValue({ ...noopItems, addItem });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    await user.type(screen.getByPlaceholderText('Add an item…'), 'Milk');
+    await user.type(screen.getByPlaceholderText('Price'), '3,50');
+    await user.press(screen.getByLabelText('Add item'));
+    expect(addItem).toHaveBeenCalledWith('Milk', { price: 3.5 });
+  });
+
+  it('shows the price on a row', async () => {
+    mockUseListItems.mockReturnValue({
+      ...noopItems,
+      items: [item({ id: 'i1', name: 'Milk', price: 3.5 })],
+    });
+    await render(<ListScreen />);
+    expect(screen.getByText('3.50')).toBeTruthy();
   });
 
   it('toggles and removes an item', async () => {

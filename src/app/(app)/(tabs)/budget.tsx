@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatAmount, parseAmount } from '../../../../lib/format';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
 import { useHousehold } from '../../../../hooks/useHousehold';
@@ -31,10 +32,6 @@ import {
 function currentMonthKey(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function formatAmount(n: number): string {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function BudgetScreen() {
@@ -55,8 +52,8 @@ export default function BudgetScreen() {
     () => new Map(categories.map((c) => [c.id, c])),
     [categories]
   );
-  const parsedAmount = parseFloat(amount.replace(',', '.'));
-  const canAdd = Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const parsedAmount = parseAmount(amount);
+  const canAdd = parsedAmount != null;
 
   const monthKey = currentMonthKey();
   const thisMonth = items.filter((t) => t.occurred_on.startsWith(monthKey));
@@ -69,7 +66,7 @@ export default function BudgetScreen() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   async function handleAdd() {
-    if (!canAdd) return;
+    if (parsedAmount == null) return;
     const selectedCategoryId = categoryId;
     setAmount('');
     setDescription('');

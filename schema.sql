@@ -170,6 +170,15 @@ create trigger list_items_touch
   before update on public.list_items
   for each row execute function public.touch_updated_at();
 
+-- Budget wiring: checking off a priced list item records a shared transaction.
+-- The link column lives on transactions but is added here because list_items is
+-- created after transactions. Unique (partial) so an item can never feed the
+-- budget twice, even if both partners check it simultaneously.
+alter table public.transactions
+  add column list_item_id uuid references public.list_items(id) on delete set null;
+create unique index transactions_list_item_uniq
+  on public.transactions (list_item_id) where list_item_id is not null;
+
 -- Now that shopping_lists exists, define the list access helper.
 create or replace function public.can_access_list(p_list_id uuid)
 returns boolean language sql security definer stable set search_path = public as $$
@@ -230,8 +239,13 @@ create policy "transactions_insert" on public.transactions
   for insert with check (public.is_household_member(household_id) and owner_id = auth.uid());
 create policy "transactions_update" on public.transactions
   for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+-- Either partner may delete a shared expense (e.g. unchecking a list item the
+-- other partner checked); private stays owner-only.
 create policy "transactions_delete" on public.transactions
-  for delete using (owner_id = auth.uid());
+  for delete using (
+    owner_id = auth.uid()
+    or (scope = 'shared' and public.is_household_member(household_id))
+  );
 
 -- settlements: visible to both members; either member may record one (a payback
 -- is agreed between partners), but both parties must belong to that household.

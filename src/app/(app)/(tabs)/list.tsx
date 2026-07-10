@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatAmount, parseAmount } from '../../../../lib/format';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useShoppingList } from '../../../../hooks/useShoppingList';
 
@@ -32,6 +33,7 @@ export default function ListScreen() {
     retry: retryItems,
   } = useListItems(listId);
   const [draft, setDraft] = useState('');
+  const [priceDraft, setPriceDraft] = useState('');
 
   const error = listError ?? itemsError;
   const loading = listLoading || (itemsLoading && items.length === 0);
@@ -41,8 +43,11 @@ export default function ListScreen() {
   async function handleAdd() {
     if (!canAdd) return;
     const name = draft.trim();
+    const price = parseAmount(priceDraft);
     setDraft('');
-    await addItem(name);
+    setPriceDraft('');
+    if (price != null) await addItem(name, { price });
+    else await addItem(name);
   }
 
   // A load error can live in either hook (resolving the list vs. its items).
@@ -103,6 +108,24 @@ export default function ListScreen() {
                 value={draft}
                 onChangeText={setDraft}
                 editable={!!listId}
+                returnKeyType="done"
+                onSubmitEditing={handleAdd}
+              />
+              <TextInput
+                style={[
+                  styles.priceInput,
+                  {
+                    color: theme.text,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.backgroundSelected,
+                  },
+                ]}
+                placeholder="Price"
+                placeholderTextColor={theme.textSecondary}
+                value={priceDraft}
+                onChangeText={setPriceDraft}
+                editable={!!listId}
+                keyboardType="decimal-pad"
                 returnKeyType="done"
                 onSubmitEditing={handleAdd}
               />
@@ -180,6 +203,11 @@ function ListRow({
           {item.name}
           {item.quantity > 1 ? `  ×${item.quantity}` : ''}
         </ThemedText>
+        {item.price != null && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {formatAmount(item.price)}
+          </ThemedText>
+        )}
       </Pressable>
       <Pressable
         onPress={onRemove}
@@ -230,6 +258,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     fontSize: 16,
+  },
+  priceInput: {
+    width: 84,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    fontSize: 16,
+    textAlign: 'right',
   },
   addButton: {
     backgroundColor: Accent.primary,

@@ -10,6 +10,8 @@ export type Transaction = {
   id: string;
   household_id: string;
   category_id: string | null;
+  /** Set when the transaction was produced by checking off a priced list item. */
+  list_item_id: string | null;
   owner_id: string;
   amount: number;
   description: string | null;
@@ -142,6 +144,7 @@ export function useTransactions() {
         id: tempId,
         household_id: householdId,
         category_id: input.categoryId ?? null,
+        list_item_id: null,
         owner_id: uid,
         amount: input.amount,
         description: input.description?.trim() || null,
