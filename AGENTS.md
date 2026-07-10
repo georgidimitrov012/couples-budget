@@ -56,3 +56,20 @@ with a 6-character invite code.
 - Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
 - Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
 - When changing the schema, update `schema.sql`, run the migration, then regenerate types.
+
+## Testing (project rule)
+- Two suites: **`pnpm test`** — deterministic Jest unit/component/regression tests
+  (jest-expo + Testing Library, no network) under `__tests__/`; and
+  **`pnpm test:security`** — the live RLS/penetration suite (`tests/security/`) that
+  exercises the real Supabase security boundary. `pnpm test:all` runs both.
+- **Run the entire collection (`pnpm test:all`) before every merge to `main`.** Do not
+  merge with a red suite.
+- **Whenever you add or change code, add or update tests to match** — new screens/hooks
+  get tests; changed behavior updates the existing test; fixed bugs get a regression test.
+- Test-writing notes for this stack: RTL-RN `render`/`renderHook`/`unmount` are **async
+  (await them)**; use `userEvent` (not `fireEvent`) for typing so state flushes; keep
+  mocked context values (e.g. `useAuth`) referentially **stable**; `test/setup.ts` sets
+  `IS_REACT_ACT_ENVIRONMENT` and mocks safe-area-context + expo-router.
+- The security suite self-cleans when `SUPABASE_SERVICE_ROLE_KEY` is in `.env` (test-only,
+  never in app code); without it, it runs in anon-fallback mode and leaves test data.
+- Test dirs are excluded from the app `tsconfig` (Jest transpiles them via Babel).
