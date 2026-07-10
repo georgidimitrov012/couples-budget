@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { CategoriesProvider } from '../../../hooks/useCategories';
 import { HouseholdProvider, useHousehold } from '../../../hooks/useHousehold';
 
 function AppNavigator() {
@@ -39,6 +40,7 @@ function AppNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={!!household}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );
@@ -47,7 +49,9 @@ function AppNavigator() {
 export default function AppLayout() {
   return (
     <HouseholdProvider>
-      <AppNavigator />
+      <CategoriesProvider>
+        <AppNavigator />
+      </CategoriesProvider>
     </HouseholdProvider>
   );
 }

@@ -93,6 +93,18 @@ async function main() {
     .select()
     .single();
 
+  // A adds a private ("Mine") and a shared ("Ours") transaction.
+  const { data: privTx } = await clientA
+    .from('transactions')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 9.99, description: 'secret', scope: 'private' })
+    .select()
+    .single();
+  const { data: sharedTx } = await clientA
+    .from('transactions')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 5, description: 'groceries', scope: 'shared' })
+    .select()
+    .single();
+
   // --- Assertions ---
   check('invite code matches 6-char A-Z0-9 format', /^[A-Z0-9]{6}$/.test(hh.invite_code || ''), hh.invite_code);
 
@@ -120,8 +132,24 @@ async function main() {
   const bPriv = await clientB.from('categories').select('id').eq('id', privCat.id);
   check("co-member (B) cannot see A's private category", (bPriv.data?.length ?? 0) === 0);
 
+  const bPrivTx = await clientB.from('transactions').select('id').eq('id', privTx.id);
+  check("co-member (B) cannot see A's private transaction (Yours stays hidden)", (bPrivTx.data?.length ?? 0) === 0);
+
+  const bSharedTx = await clientB.from('transactions').select('id').eq('id', sharedTx.id);
+  check("co-member (B) can see A's shared transaction (Ours)", (bSharedTx.data?.length ?? 0) === 1);
+
   const bShared = await clientB.from('categories').select('id').eq('id', sharedCat.id);
   check("co-member (B) can see A's shared category", (bShared.data?.length ?? 0) === 1);
+
+  const cInsertCat = await clientC
+    .from('categories')
+    .insert({ household_id: hh.id, owner_id: c.id, name: 'sneaky cat', scope: 'shared' });
+  check('non-member (C) cannot create a category', cInsertCat.error != null, cInsertCat.error?.message ?? 'NO ERROR');
+
+  const catSpoof = await clientA
+    .from('categories')
+    .insert({ household_id: hh.id, owner_id: b.id, name: 'spoof', scope: 'shared' });
+  check('category owner spoofing is rejected (owner_id must equal auth.uid)', catSpoof.error != null, catSpoof.error?.message ?? 'NO ERROR');
 
   const fullJoin = await clientC.rpc('join_household', { p_code: hh.invite_code });
   check('cannot join a full (2-member) household', fullJoin.error != null, fullJoin.error?.message ?? 'NO ERROR');

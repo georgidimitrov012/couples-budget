@@ -13,11 +13,17 @@ describe('route structure', () => {
     expect(files).not.toContain('index.tsx');
   });
 
-  it('the tabs group owns the index (/) route and the shopping list', () => {
+  it('the tabs group owns index (/), the shopping list, and the budget', () => {
     const files = fs.readdirSync(path.join(appDir, '(tabs)'));
     expect(files).toContain('index.tsx');
     expect(files).toContain('list.tsx');
+    expect(files).toContain('budget.tsx');
     // The template Explore tab was replaced by the shopping list.
     expect(files).not.toContain('explore.tsx');
+  });
+
+  it('registers the categories modal at the (app) level (a sibling of the tabs)', () => {
+    const files = fs.readdirSync(appDir);
+    expect(files).toContain('categories.tsx');
   });
 });
