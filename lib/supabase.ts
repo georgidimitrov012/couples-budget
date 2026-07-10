@@ -8,11 +8,14 @@ import { createClient } from '@supabase/supabase-js';
 //   import type { Database } from './database.types';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+// Accept either the modern "publishable" key or the legacy "anon" key name.
+// Both are referenced literally so Expo inlines them into the client bundle.
+const supabaseKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseKey) {
   throw new Error(
-    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
+    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or _ANON_KEY). ' +
       'Copy .env.example to .env and fill in your Supabase project values.'
   );
 }
@@ -56,7 +59,7 @@ const ChunkedSecureStore = {
   },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     // On web, leave storage undefined so supabase-js falls back to localStorage.
     storage: Platform.OS === 'web' ? undefined : (ChunkedSecureStore as any),
