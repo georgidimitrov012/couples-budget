@@ -10,10 +10,13 @@ create extension if not exists "pgcrypto";
 -- Helpers
 -- ----------------------------------------------------------------
 
--- Short, human-friendly invite code (6 hex chars, uppercased)
+-- Short, human-friendly invite code (6 hex chars, uppercased).
+-- Uses gen_random_uuid() (core, in pg_catalog) rather than pgcrypto's
+-- gen_random_bytes, which isn't on the search_path inside our SECURITY DEFINER
+-- RPCs (Supabase installs pgcrypto in the `extensions` schema).
 create or replace function public.generate_invite_code()
 returns text language sql volatile as $$
-  select upper(substring(encode(gen_random_bytes(6), 'hex') from 1 for 6));
+  select upper(substring(replace(gen_random_uuid()::text, '-', '') from 1 for 6));
 $$;
 
 -- ----------------------------------------------------------------
@@ -289,3 +292,5 @@ grant execute on function public.join_household(text)   to authenticated;
 alter publication supabase_realtime add table public.list_items;
 alter publication supabase_realtime add table public.shopping_lists;
 alter publication supabase_realtime add table public.transactions;
+-- Lets the household creator see their partner appear live during onboarding.
+alter publication supabase_realtime add table public.household_members;
