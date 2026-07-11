@@ -135,6 +135,28 @@ create table public.settlements (
 );
 
 -- ----------------------------------------------------------------
+-- receipts (scanned paper bills → budget + shopping-list actions)
+-- The image lives in the private 'receipts' Storage bucket at
+-- <household_id>/<receipt_id>.<ext>; image_path points at it. Each applied
+-- line becomes a transaction tagged with receipt_id (see the column added to
+-- transactions below), which is how a receipt's expenses are traced.
+-- ----------------------------------------------------------------
+create table public.receipts (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  uploaded_by  uuid not null references auth.users(id),
+  image_path   text,
+  merchant     text,
+  purchased_on date,
+  currency     text,
+  total        numeric(12,2),
+  created_at   timestamptz not null default now()
+);
+
+alter table public.transactions
+  add column receipt_id uuid references public.receipts(id) on delete set null;
+
+-- ----------------------------------------------------------------
 -- shopping lists (always shared within a household)
 -- ----------------------------------------------------------------
 create table public.shopping_lists (
@@ -199,6 +221,7 @@ alter table public.household_members  enable row level security;
 alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
 alter table public.settlements        enable row level security;
+alter table public.receipts           enable row level security;
 alter table public.shopping_lists     enable row level security;
 alter table public.list_items         enable row level security;
 
@@ -261,6 +284,14 @@ create policy "settlements_insert" on public.settlements
                 where hm.household_id = settlements.household_id and hm.user_id = to_user)
   );
 create policy "settlements_delete" on public.settlements
+  for delete using (public.is_household_member(household_id));
+
+-- receipts: visible to both members; the uploader records their own.
+create policy "receipts_select" on public.receipts
+  for select using (public.is_household_member(household_id));
+create policy "receipts_insert" on public.receipts
+  for insert with check (public.is_household_member(household_id) and uploaded_by = auth.uid());
+create policy "receipts_delete" on public.receipts
   for delete using (public.is_household_member(household_id));
 
 -- shopping_lists: any household member (shared)
@@ -332,6 +363,82 @@ $$;
 
 grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.join_household(text)   to authenticated;
+
+-- ----------------------------------------------------------------
+-- RPC: apply a reviewed receipt atomically. Runs as the caller (SECURITY
+-- INVOKER) so every insert/update still passes RLS. p_lines is the reviewed
+-- rows: [{ name, amount, scope, action, list_item_id }] where action is
+-- 'add' (standalone expense), 'check' (also tick the matched list item), or
+-- 'skip' (ignored). Each applied line becomes a shared/private transaction
+-- tagged with the new receipt's id.
+-- ----------------------------------------------------------------
+create or replace function public.apply_receipt(
+  p_household_id uuid,
+  p_image_path   text,
+  p_merchant     text,
+  p_purchased_on date,
+  p_currency     text,
+  p_lines        jsonb
+)
+returns public.receipts
+language plpgsql as $$
+declare
+  r      public.receipts;
+  line   jsonb;
+  v_total numeric(12,2);
+  v_scope text;
+  v_item  uuid;
+begin
+  if not public.is_household_member(p_household_id) then
+    raise exception 'Not a member of this household';
+  end if;
+
+  select coalesce(sum((l->>'amount')::numeric), 0)
+    into v_total
+    from jsonb_array_elements(p_lines) l
+   where l->>'action' <> 'skip';
+
+  insert into public.receipts (household_id, uploaded_by, image_path, merchant, purchased_on, currency, total)
+  values (p_household_id, auth.uid(), nullif(p_image_path, ''), nullif(p_merchant, ''),
+          p_purchased_on, nullif(p_currency, ''), v_total)
+  returning * into r;
+
+  for line in select * from jsonb_array_elements(p_lines)
+  loop
+    if (line->>'action') = 'skip' then
+      continue;
+    end if;
+    v_scope := coalesce(nullif(line->>'scope', ''), 'shared');
+    v_item  := nullif(line->>'list_item_id', '')::uuid;
+
+    -- Link to the matched list item when checking it off. If that item already
+    -- fed the budget (unique list_item_id), fall back to an unlinked expense so
+    -- the receipt still applies rather than aborting the whole submit.
+    begin
+      insert into public.transactions
+        (household_id, owner_id, amount, description, occurred_on, scope, list_item_id, receipt_id)
+      values (p_household_id, auth.uid(), (line->>'amount')::numeric, nullif(line->>'name', ''),
+              coalesce(p_purchased_on, current_date), v_scope,
+              case when (line->>'action') = 'check' then v_item else null end, r.id);
+    exception when unique_violation then
+      insert into public.transactions
+        (household_id, owner_id, amount, description, occurred_on, scope, list_item_id, receipt_id)
+      values (p_household_id, auth.uid(), (line->>'amount')::numeric, nullif(line->>'name', ''),
+              coalesce(p_purchased_on, current_date), v_scope, null, r.id);
+    end;
+
+    if (line->>'action') = 'check' and v_item is not null then
+      update public.list_items
+         set is_checked = true, checked_by = auth.uid()
+       where id = v_item;
+    end if;
+  end loop;
+
+  return r;
+end;
+$$;
+
+grant execute on function public.apply_receipt(uuid, text, text, date, text, jsonb) to authenticated;
 
 -- ----------------------------------------------------------------
 -- Realtime: broadcast changes for the live shopping list (+ budget)

@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -62,18 +63,31 @@ export default function ListScreen() {
         <View style={styles.inner}>
           <View style={styles.header}>
             <ThemedText type="subtitle">Shopping list</ThemedText>
-            {checkedCount > 0 && (
-              <Pressable
-                onPress={clearChecked}
-                accessibilityRole="button"
-                accessibilityLabel="Clear checked items"
-                hitSlop={8}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Clear checked ({checkedCount})
-                </ThemedText>
-              </Pressable>
-            )}
+            <View style={styles.headerActions}>
+              {checkedCount > 0 && (
+                <Pressable
+                  onPress={clearChecked}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear checked items"
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Clear checked ({checkedCount})
+                  </ThemedText>
+                </Pressable>
+              )}
+              <Link href="/receipt" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Scan receipt"
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedText type="smallBold" style={styles.scanLink}>
+                    Scan receipt
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            </View>
           </View>
 
           {error && (
@@ -242,6 +256,8 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  scanLink: { color: Accent.primary },
   pressed: { opacity: 0.6 },
   banner: {
     borderRadius: Spacing.three,

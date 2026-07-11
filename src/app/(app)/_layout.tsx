@@ -41,6 +41,7 @@ function AppNavigator() {
       <Stack.Protected guard={!!household}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="receipt" options={{ presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );
