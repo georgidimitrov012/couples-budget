@@ -22,8 +22,9 @@ describe('route structure', () => {
     expect(files).not.toContain('explore.tsx');
   });
 
-  it('registers the categories modal at the (app) level (a sibling of the tabs)', () => {
+  it('registers the categories and receipt modals at the (app) level (siblings of the tabs)', () => {
     const files = fs.readdirSync(appDir);
     expect(files).toContain('categories.tsx');
+    expect(files).toContain('receipt.tsx');
   });
 });

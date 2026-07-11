@@ -158,3 +158,88 @@ create policy "transactions_delete" on public.transactions
 **Verify:** `pnpm test:security` — the list→budget wiring checks should pass.
 **Smoke-test:** add a list item with a price, check it off → it appears as an "Ours"
 expense on the Budget tab (and moves the settle-up balance); uncheck → it disappears.
+
+---
+
+## 6. Receipt scanning (Claude vision Edge Function)
+
+Scanning a paper receipt extracts its line items, the user reviews/edits them, and on
+submit each applied line becomes a shared expense (matched items are also checked off the
+shopping list). Three pieces of infrastructure back this: a DB migration, a private
+Storage bucket, and an Edge Function holding the Anthropic key.
+
+### 6a. Database migration
+
+Fresh projects get this from `schema.sql`; existing projects apply it once in the SQL
+Editor:
+
+```sql
+create table public.receipts (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  uploaded_by  uuid not null references auth.users(id),
+  image_path   text,
+  merchant     text,
+  purchased_on date,
+  currency     text,
+  total        numeric(12,2),
+  created_at   timestamptz not null default now()
+);
+alter table public.transactions
+  add column receipt_id uuid references public.receipts(id) on delete set null;
+
+alter table public.receipts enable row level security;
+create policy "receipts_select" on public.receipts
+  for select using (public.is_household_member(household_id));
+create policy "receipts_insert" on public.receipts
+  for insert with check (public.is_household_member(household_id) and uploaded_by = auth.uid());
+create policy "receipts_delete" on public.receipts
+  for delete using (public.is_household_member(household_id));
+```
+
+Then create the `apply_receipt` RPC — copy the full `create or replace function
+public.apply_receipt(...)` block (and its `grant execute`) from `schema.sql`.
+
+### 6b. Private Storage bucket + RLS
+
+Dashboard → **Storage** → **New bucket** → name `receipts`, **Private** (uncheck public).
+Then in the SQL Editor add policies scoping objects to the household in the first path
+segment (`<household_id>/<receipt_id>.jpg`):
+
+```sql
+create policy "receipts_read" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'receipts'
+    and public.is_household_member(((storage.foldername(name))[1])::uuid)
+  );
+create policy "receipts_write" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'receipts'
+    and public.is_household_member(((storage.foldername(name))[1])::uuid)
+  );
+```
+
+### 6c. Edge Function + Anthropic key
+
+Requires the Supabase CLI (`pnpm dlx supabase --version`) linked to the project
+(`supabase link`). The function source is in `supabase/functions/scan-receipt/`.
+
+```bash
+# Set the secret (never goes in .env or the app bundle):
+pnpm dlx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+# Optional — override the default model (claude-haiku-4-5-20251001):
+pnpm dlx supabase secrets set ANTHROPIC_MODEL=claude-sonnet-5
+
+# Deploy:
+pnpm dlx supabase functions deploy scan-receipt
+```
+
+The function authenticates the caller (rejects anonymous requests), so it needs the
+default JWT verification left on. `SUPABASE_URL` / `SUPABASE_ANON_KEY` are injected
+automatically.
+
+**Smoke-test:** on the List tab tap **Scan receipt**, take/pick a photo of a receipt →
+the review screen shows editable line items → adjust and **Submit** → the expenses land
+on the Budget tab (matched items get checked off), and the image + record appear under
+Storage → `receipts`. If extraction is weak on your receipts, bump `ANTHROPIC_MODEL` to a
+larger model and redeploy is **not** needed (secrets apply on next invocation).

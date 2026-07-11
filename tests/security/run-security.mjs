@@ -201,6 +201,53 @@ async function main() {
   const bDelPriv = await clientB.from('transactions').delete().eq('id', privTx.id).select();
   check("co-member (B) cannot delete A's private transaction", (bDelPriv.data?.length ?? 0) === 0);
 
+  // Receipts: household-scoped, uploader records their own.
+  const { data: receipt, error: rcErr } = await clientA
+    .from('receipts')
+    .insert({ household_id: hh.id, uploaded_by: a.id, merchant: 'Kaufland' })
+    .select()
+    .single();
+  check('member (A) can record a receipt', rcErr == null, rcErr?.message ?? '');
+
+  const bReadReceipt = await clientB.from('receipts').select('id').eq('id', receipt?.id);
+  check('co-member (B) can read receipts', (bReadReceipt.data?.length ?? 0) === 1);
+
+  const cReadReceipt = await clientC.from('receipts').select('id').eq('id', receipt?.id);
+  check('outsider (C) cannot read receipts', (cReadReceipt.data?.length ?? 0) === 0);
+
+  const cInsertReceipt = await clientC
+    .from('receipts')
+    .insert({ household_id: hh.id, uploaded_by: c.id });
+  check('non-member (C) cannot record a receipt', cInsertReceipt.error != null, cInsertReceipt.error?.message ?? 'NO ERROR');
+
+  const receiptSpoof = await clientA
+    .from('receipts')
+    .insert({ household_id: hh.id, uploaded_by: b.id });
+  check('receipt uploader spoofing is rejected (uploaded_by must equal auth.uid)', receiptSpoof.error != null, receiptSpoof.error?.message ?? 'NO ERROR');
+
+  const cApply = await clientC.rpc('apply_receipt', {
+    p_household_id: hh.id,
+    p_image_path: null,
+    p_merchant: null,
+    p_purchased_on: null,
+    p_currency: null,
+    p_lines: [],
+  });
+  check('non-member (C) cannot apply a receipt (RPC guard)', cApply.error != null, cApply.error?.message ?? 'NO ERROR');
+
+  const applied = await clientA.rpc('apply_receipt', {
+    p_household_id: hh.id,
+    p_image_path: `${hh.id}/apply-test.jpg`,
+    p_merchant: 'Coffee Shop',
+    p_purchased_on: '2026-07-11',
+    p_currency: 'BGN',
+    p_lines: [{ name: 'Coffee', amount: 4, scope: 'shared', action: 'add', list_item_id: null }],
+  });
+  const appliedTx = applied.data
+    ? await clientA.from('transactions').select('id').eq('receipt_id', applied.data.id)
+    : { data: [] };
+  check('member (A) apply_receipt records the reviewed expense', (appliedTx.data?.length ?? 0) === 1, applied.error?.message ?? '');
+
   const fullJoin = await clientC.rpc('join_household', { p_code: hh.invite_code });
   check('cannot join a full (2-member) household', fullJoin.error != null, fullJoin.error?.message ?? 'NO ERROR');
 
