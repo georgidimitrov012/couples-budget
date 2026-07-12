@@ -12,9 +12,17 @@ export type Category = {
   name: string;
   color: string | null;
   scope: CategoryScope;
+  monthly_limit: number | null;
 };
 
-const COLUMNS = 'id, household_id, owner_id, name, color, scope';
+const COLUMNS = 'id, household_id, owner_id, name, color, scope, monthly_limit';
+
+export type CategoryPatch = {
+  name?: string;
+  color?: string | null;
+  scope?: CategoryScope;
+  monthlyLimit?: number | null;
+};
 
 type CategoriesContextValue = {
   categories: Category[];
@@ -25,7 +33,9 @@ type CategoriesContextValue = {
     name: string;
     color?: string;
     scope: CategoryScope;
+    monthlyLimit?: number | null;
   }) => Promise<{ error: string | null }>;
+  updateCategory: (cat: Category, patch: CategoryPatch) => Promise<{ error: string | null }>;
   removeCategory: (cat: Category) => Promise<{ error: string | null }>;
 };
 
@@ -95,7 +105,12 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   }, [fetchCategories]);
 
   const addCategory = useCallback(
-    async (input: { name: string; color?: string; scope: CategoryScope }) => {
+    async (input: {
+      name: string;
+      color?: string;
+      scope: CategoryScope;
+      monthlyLimit?: number | null;
+    }) => {
       const uid = user?.id;
       if (!householdId || !uid) return { error: 'Not ready' };
       const name = input.name.trim();
@@ -109,6 +124,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           name,
           color: input.color ?? null,
           scope: input.scope,
+          monthly_limit: input.monthlyLimit ?? null,
         })
         .select(COLUMNS)
         .single();
@@ -117,6 +133,44 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       return { error: null };
     },
     [householdId, user]
+  );
+
+  // Owner-only per RLS (categories_update: owner_id = auth.uid()). Used for the
+  // monthly limit; optimistic with snapshot restore on failure.
+  const updateCategory = useCallback(
+    async (cat: Category, patch: CategoryPatch) => {
+      const dbPatch: Record<string, unknown> = {};
+      const local: Partial<Category> = {};
+      if (patch.name !== undefined) {
+        dbPatch.name = patch.name;
+        local.name = patch.name;
+      }
+      if (patch.color !== undefined) {
+        dbPatch.color = patch.color;
+        local.color = patch.color;
+      }
+      if (patch.scope !== undefined) {
+        dbPatch.scope = patch.scope;
+        local.scope = patch.scope;
+      }
+      if (patch.monthlyLimit !== undefined) {
+        dbPatch.monthly_limit = patch.monthlyLimit;
+        local.monthly_limit = patch.monthlyLimit;
+      }
+      if (Object.keys(dbPatch).length === 0) return { error: null };
+
+      const snapshot = categories;
+      setCategories((prev) =>
+        prev.map((c) => (c.id === cat.id ? { ...c, ...local } : c)).sort(byName)
+      );
+      const { error } = await supabase.from('categories').update(dbPatch).eq('id', cat.id);
+      if (error) {
+        setCategories(snapshot); // restore
+        return { error: error.message };
+      }
+      return { error: null };
+    },
+    [categories]
   );
 
   const removeCategory = useCallback(
@@ -135,7 +189,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   return (
     <CategoriesContext.Provider
-      value={{ categories, loading, error, refresh, addCategory, removeCategory }}>
+      value={{ categories, loading, error, refresh, addCategory, updateCategory, removeCategory }}>
       {children}
     </CategoriesContext.Provider>
   );
