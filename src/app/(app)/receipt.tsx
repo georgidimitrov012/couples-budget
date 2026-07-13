@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatAmount } from '../../../lib/format';
 import {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   metaLine: { marginBottom: Spacing.two },
   listContent: { gap: Spacing.two, paddingVertical: Spacing.one },
-  row: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  row: { borderRadius: Radius.lg, padding: Spacing.three, gap: Spacing.three, ...Shadow.card },
   rowDim: { opacity: 0.5 },
   rowTop: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
   nameInput: {

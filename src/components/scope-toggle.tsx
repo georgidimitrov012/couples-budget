@@ -11,6 +11,9 @@ const OPTIONS: { value: Scope; label: string }[] = [
   { value: 'private', label: 'Mine' },
 ];
 
+// Each scope wears its identity colour when active: Ours teal, Mine coral.
+const ACTIVE_COLOR: Record<Scope, string> = { shared: Accent.ours, private: Accent.mine };
+
 /**
  * The Ours/Mine segmented control used by the budget and categories forms.
  * "Ours" = scope 'shared' (visible to both partners), "Mine" = scope 'private'
@@ -29,10 +32,10 @@ export function ScopeToggle({ scope, onChange }: { scope: Scope; onChange: (s: S
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={`Scope: ${o.label}`}
-            style={[styles.option, active && { backgroundColor: Accent.primary }]}>
+            style={[styles.option, active && { backgroundColor: ACTIVE_COLOR[o.value] }]}>
             <ThemedText
               type="smallBold"
-              style={{ color: active ? Accent.onPrimary : theme.textSecondary }}>
+              style={{ color: active ? Accent.onScope : theme.textSecondary }}>
               {o.label}
             </ThemedText>
           </Pressable>

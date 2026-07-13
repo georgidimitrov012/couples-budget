@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatAmount, parseAmount } from '../../../../lib/format';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
@@ -149,7 +149,7 @@ export default function ListScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Add item"
                 style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
-                <ThemedText style={styles.addButtonText}>Add</ThemedText>
+                <ThemedText style={styles.addButtonText}>+</ThemedText>
               </Pressable>
             </View>
 
@@ -218,9 +218,11 @@ function ListRow({
           {item.quantity > 1 ? `  ×${item.quantity}` : ''}
         </ThemedText>
         {item.price != null && (
-          <ThemedText type="small" themeColor="textSecondary">
-            {formatAmount(item.price)}
-          </ThemedText>
+          <View style={[styles.pricePill, { backgroundColor: theme.background }]}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.pricePillText}>
+              {formatAmount(item.price)}
+            </ThemedText>
+          </View>
         )}
       </Pressable>
       <Pressable
@@ -286,23 +288,27 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: Accent.primary,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.md,
+    width: 52,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadow.card,
   },
-  addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
+  addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 26, lineHeight: 30 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
   listContent: { gap: Spacing.two, paddingVertical: Spacing.one },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.two,
+    ...Shadow.card,
   },
+  pricePill: { paddingHorizontal: Spacing.two, paddingVertical: 3, borderRadius: Radius.pill },
+  pricePillText: { fontWeight: '700', fontVariant: ['tabular-nums'] },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   checkbox: {
     width: 24,

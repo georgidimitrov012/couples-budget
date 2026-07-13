@@ -11,7 +11,7 @@ import { Pressable, View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function AppTabs() {
   return (
@@ -38,9 +38,12 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
+        type={isFocused ? 'tint' : 'backgroundElement'}
         style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+        <ThemedText
+          type="small"
+          themeColor={isFocused ? undefined : 'textSecondary'}
+          style={isFocused ? styles.tabActive : undefined}>
           {children}
         </ThemedText>
       </ThemedView>
@@ -92,4 +95,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
   },
+  tabActive: { color: Accent.primary, fontWeight: '700' },
 });
