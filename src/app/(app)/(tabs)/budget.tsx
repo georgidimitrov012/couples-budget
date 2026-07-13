@@ -13,11 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ProgressBar } from '@/components/progress-bar';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { formatAmount, parseAmount } from '../../../../lib/format';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
@@ -64,6 +66,12 @@ export default function BudgetScreen() {
   const mineTotal = thisMonth
     .filter((t) => t.scope === 'private')
     .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const spendByCategory = useMemo(() => monthlySpendByCategory(items, monthKey), [items, monthKey]);
+  const budgets = useMemo(
+    () => categories.filter((c) => c.monthly_limit != null && c.monthly_limit > 0),
+    [categories]
+  );
 
   async function handleAdd() {
     if (parsedAmount == null) return;
@@ -114,6 +122,10 @@ export default function BudgetScreen() {
               error={settle.error}
               onSettle={settle.settleUp}
             />
+          )}
+
+          {budgets.length > 0 && (
+            <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
           )}
 
           <ThemedView type="backgroundElement" style={styles.addCard}>
@@ -279,6 +291,44 @@ function SettleCard({
   );
 }
 
+function CategoryBudgets({
+  budgets,
+  spendByCategory,
+}: {
+  budgets: Category[];
+  spendByCategory: Map<string, number>;
+}) {
+  return (
+    <ThemedView type="backgroundElement" style={styles.budgetsCard} testID="category-budgets">
+      <ThemedText type="smallBold" themeColor="textSecondary">
+        CATEGORY BUDGETS · THIS MONTH
+      </ThemedText>
+      {budgets.map((c) => {
+        const spent = spendByCategory.get(c.id) ?? 0;
+        const limit = c.monthly_limit ?? 0;
+        const ratio = progressRatio(spent, limit);
+        const over = ratio > 1;
+        return (
+          <View key={c.id} style={styles.budgetRow} testID={`budget-${c.id}`}>
+            <View style={styles.budgetHead}>
+              <View style={[styles.chipDot, { backgroundColor: c.color ?? '#60646c' }]} />
+              <ThemedText type="small">{c.name}</ThemedText>
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                style={[styles.budgetAmount, over && styles.overText]}
+                testID={`budget-amount-${c.id}`}>
+                {formatAmount(spent)} / {formatAmount(limit)}
+              </ThemedText>
+            </View>
+            <ProgressBar ratio={ratio} color={over ? Accent.danger : c.color ?? Accent.primary} />
+          </View>
+        );
+      })}
+    </ThemedView>
+  );
+}
+
 function SummaryCard({ label, sublabel, value }: { label: string; sublabel: string; value: number }) {
   return (
     <ThemedView type="backgroundElement" style={styles.summaryCard}>
@@ -412,6 +462,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   settleButtonText: { color: Accent.onPrimary },
+  budgetsCard: {
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    marginBottom: Spacing.three,
+  },
+  budgetRow: { gap: Spacing.one },
+  budgetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  budgetAmount: { marginLeft: 'auto' },
+  overText: { color: Accent.danger },
   summaryCard: {
     flex: 1,
     borderRadius: Spacing.three,

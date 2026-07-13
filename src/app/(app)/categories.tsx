@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { parseAmount } from '../../../lib/format';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCategories, type Category, type CategoryScope } from '../../../hooks/useCategories';
 
@@ -33,11 +34,12 @@ export default function CategoriesScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
-  const { categories, loading, error, addCategory, removeCategory } = useCategories();
+  const { categories, loading, error, addCategory, updateCategory, removeCategory } = useCategories();
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
   const [scope, setScope] = useState<CategoryScope>('shared');
+  const [limit, setLimit] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +47,12 @@ export default function CategoriesScreen() {
     if (saving || !name.trim()) return;
     setSaving(true);
     setFormError(null);
-    const { error: addError } = await addCategory({ name, color, scope });
+    const { error: addError } = await addCategory({
+      name,
+      color,
+      scope,
+      monthlyLimit: parseAmount(limit),
+    });
     if (addError) {
       setFormError(addError);
       setSaving(false);
@@ -54,7 +61,14 @@ export default function CategoriesScreen() {
     setName('');
     setScope('shared');
     setColor(CATEGORY_COLORS[0]);
+    setLimit('');
     setSaving(false);
+  }
+
+  // Commit a row's edited monthly limit, skipping no-op writes.
+  function handleSetLimit(cat: Category, next: number | null) {
+    if (next === cat.monthly_limit) return;
+    updateCategory(cat, { monthlyLimit: next });
   }
 
   return (
@@ -103,6 +117,21 @@ export default function CategoriesScreen() {
                 />
               ))}
             </View>
+
+            <TextInput
+              style={[
+                styles.input,
+                { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+              ]}
+              placeholder="Monthly limit (optional)"
+              placeholderTextColor={theme.textSecondary}
+              value={limit}
+              onChangeText={setLimit}
+              keyboardType="decimal-pad"
+              returnKeyType="done"
+              onSubmitEditing={handleAdd}
+              accessibilityLabel="Monthly limit"
+            />
 
             <View style={styles.formRow}>
               <ScopeToggle scope={scope} onChange={setScope} />
@@ -154,7 +183,8 @@ export default function CategoriesScreen() {
               renderItem={({ item }) => (
                 <CategoryRow
                   category={item}
-                  canDelete={item.owner_id === user?.id}
+                  canEdit={item.owner_id === user?.id}
+                  onSetLimit={(next) => handleSetLimit(item, next)}
                   onRemove={() => removeCategory(item)}
                 />
               )}
@@ -168,23 +198,38 @@ export default function CategoriesScreen() {
 
 function CategoryRow({
   category,
-  canDelete,
+  canEdit,
+  onSetLimit,
   onRemove,
 }: {
   category: Category;
-  canDelete: boolean;
+  canEdit: boolean;
+  onSetLimit: (next: number | null) => void;
   onRemove: () => void;
 }) {
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <View style={[styles.dot, { backgroundColor: category.color ?? '#60646c' }]} />
-      <ThemedText style={styles.rowName} numberOfLines={1}>
-        {category.name}
-      </ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        {category.scope === 'shared' ? 'Ours' : 'Mine'}
-      </ThemedText>
-      {canDelete && (
+      <View style={styles.rowMain}>
+        <ThemedText style={styles.rowName} numberOfLines={1}>
+          {category.name}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {category.scope === 'shared' ? 'Ours' : 'Mine'}
+        </ThemedText>
+      </View>
+      {canEdit ? (
+        <LimitInput
+          categoryName={category.name}
+          value={category.monthly_limit}
+          onCommit={onSetLimit}
+        />
+      ) : category.monthly_limit != null ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Limit {category.monthly_limit}
+        </ThemedText>
+      ) : null}
+      {canEdit && (
         <Pressable
           onPress={onRemove}
           accessibilityRole="button"
@@ -197,6 +242,37 @@ function CategoryRow({
         </Pressable>
       )}
     </ThemedView>
+  );
+}
+
+// Editable monthly limit; commits on blur/submit. Empty or invalid clears it.
+function LimitInput({
+  categoryName,
+  value,
+  onCommit,
+}: {
+  categoryName: string;
+  value: number | null;
+  onCommit: (next: number | null) => void;
+}) {
+  const theme = useTheme();
+  const [text, setText] = useState(value != null ? String(value) : '');
+  useEffect(() => {
+    setText(value != null ? String(value) : '');
+  }, [value]);
+
+  return (
+    <TextInput
+      style={[styles.limitInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+      value={text}
+      onChangeText={setText}
+      onEndEditing={() => onCommit(text.trim() === '' ? null : parseAmount(text))}
+      keyboardType="decimal-pad"
+      returnKeyType="done"
+      placeholder="Limit"
+      placeholderTextColor={theme.textSecondary}
+      accessibilityLabel={`Monthly limit for ${categoryName}`}
+    />
   );
 }
 
@@ -258,6 +334,16 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   dot: { width: 16, height: 16, borderRadius: 8 },
-  rowName: { flex: 1, fontSize: 16 },
+  rowMain: { flex: 1, gap: Spacing.half },
+  rowName: { fontSize: 16 },
+  limitInput: {
+    width: 76,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    fontSize: 14,
+    textAlign: 'right',
+  },
   remove: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
 });

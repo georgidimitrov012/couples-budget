@@ -27,6 +27,7 @@ const FOOD = {
   name: 'Food',
   color: '#3c87f7',
   scope: 'shared' as const,
+  monthly_limit: null as number | null,
 };
 
 // A date in the current month so it lands in the "this month" totals.
@@ -183,6 +184,36 @@ describe('BudgetScreen', () => {
     expect(screen.getByText('Lunch')).toBeTruthy();
     // "Food" appears both in the picker chip and on the row.
     expect(screen.getAllByText('Food').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows category budget progress when a category has a limit', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [
+        tx({ id: 's1', scope: 'shared', amount: 12, category_id: 'c1' }),
+        tx({ id: 's2', scope: 'shared', amount: 8, category_id: 'c1' }),
+      ],
+    });
+    mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 50 }] });
+    await render(<BudgetScreen />);
+    expect(screen.getByTestId('category-budgets')).toBeTruthy();
+    expect(screen.getByText('20.00 / 50.00')).toBeTruthy();
+  });
+
+  it('shows an over-limit category budget', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 's1', scope: 'shared', amount: 20, category_id: 'c1' })],
+    });
+    mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 10 }] });
+    await render(<BudgetScreen />);
+    expect(screen.getByText('20.00 / 10.00')).toBeTruthy();
+  });
+
+  it('hides the budgets section when no category has a limit', async () => {
+    mockUseCategories.mockReturnValue({ categories: [FOOD] }); // monthly_limit null
+    await render(<BudgetScreen />);
+    expect(screen.queryByTestId('category-budgets')).toBeNull();
   });
 
   it('shows an error banner and retries on tap', async () => {

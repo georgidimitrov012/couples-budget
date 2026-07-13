@@ -151,6 +151,20 @@ async function main() {
     .insert({ household_id: hh.id, owner_id: b.id, name: 'spoof', scope: 'shared' });
   check('category owner spoofing is rejected (owner_id must equal auth.uid)', catSpoof.error != null, catSpoof.error?.message ?? 'NO ERROR');
 
+  const aSetLimit = await clientA
+    .from('categories')
+    .update({ monthly_limit: 100 })
+    .eq('id', sharedCat.id)
+    .select();
+  check('owner (A) can set a category monthly limit', (aSetLimit.data?.length ?? 0) === 1, aSetLimit.error?.message ?? '');
+
+  const bSetLimit = await clientB
+    .from('categories')
+    .update({ monthly_limit: 5 })
+    .eq('id', sharedCat.id)
+    .select();
+  check("co-member (B) cannot edit A's category (owner-only update)", (bSetLimit.data?.length ?? 0) === 0);
+
   // Settle-up: A records that B paid back 2.50 (half of the shared 5.00).
   const settleIns = await clientA
     .from('settlements')
