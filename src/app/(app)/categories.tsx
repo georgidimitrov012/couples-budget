@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { parseAmount } from '../../../lib/format';
 import { useAuth } from '../../../hooks/useAuth';
@@ -296,10 +296,11 @@ const styles = StyleSheet.create({
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },
   addCard: {
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.three,
     marginBottom: Spacing.three,
+    ...Shadow.card,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -328,10 +329,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.three,
+    ...Shadow.card,
   },
   dot: { width: 16, height: 16, borderRadius: 8 },
   rowMain: { flex: 1, gap: Spacing.half },

@@ -13,11 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/avatar';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { formatAmount, parseAmount } from '../../../../lib/format';
@@ -44,6 +45,8 @@ export default function BudgetScreen() {
   const { members } = useHousehold();
   const settle = useSettleUp(items);
   const partner = members.find((m) => m.user_id !== user?.id) ?? null;
+  const myName =
+    (user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? 'You';
 
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -109,13 +112,14 @@ export default function BudgetScreen() {
           </View>
 
           <View style={styles.summaryRow}>
-            <SummaryCard label="Ours" sublabel="this month" value={oursTotal} />
-            <SummaryCard label="Mine" sublabel="this month" value={mineTotal} />
+            <SummaryCard label="Ours" sublabel="this month" value={oursTotal} tone="ours" />
+            <SummaryCard label="Mine" sublabel="this month" value={mineTotal} tone="mine" />
           </View>
 
           {partner && (
             <SettleCard
               partnerName={partner.display_name ?? 'Your partner'}
+              myName={myName}
               balance={settle.balance}
               lastSettledOn={settle.lastSettledOn}
               settling={settle.settling}
@@ -232,6 +236,7 @@ export default function BudgetScreen() {
 
 function SettleCard({
   partnerName,
+  myName,
   balance,
   lastSettledOn,
   settling,
@@ -239,6 +244,7 @@ function SettleCard({
   onSettle,
 }: {
   partnerName: string;
+  myName: string;
   balance: number;
   lastSettledOn: string | null;
   settling: boolean;
@@ -248,7 +254,13 @@ function SettleCard({
   const square = Math.round(balance * 100) === 0;
   const owed = formatAmount(Math.abs(balance));
   return (
-    <ThemedView type="backgroundElement" style={styles.settleCard}>
+    <ThemedView type="backgroundElement" style={[styles.settleCard, Shadow.card]}>
+      <View style={styles.settleAvatars}>
+        <Avatar name={partnerName} color={Accent.mine} size={34} ring />
+        <View style={styles.avatarOverlap}>
+          <Avatar name={myName} color={Accent.ours} size={34} ring />
+        </View>
+      </View>
       <View style={styles.settleMain}>
         <ThemedText testID="settle-balance">
           {square
@@ -279,10 +291,10 @@ function SettleCard({
             { opacity: pressed || settling ? 0.6 : 1 },
           ]}>
           {settling ? (
-            <ActivityIndicator color={Accent.onPrimary} />
+            <ActivityIndicator color={Accent.onScope} />
           ) : (
             <ThemedText type="smallBold" style={styles.settleButtonText}>
-              Mark as settled
+              Settle
             </ThemedText>
           )}
         </Pressable>
@@ -329,19 +341,32 @@ function CategoryBudgets({
   );
 }
 
-function SummaryCard({ label, sublabel, value }: { label: string; sublabel: string; value: number }) {
+function SummaryCard({
+  label,
+  sublabel,
+  value,
+  tone,
+}: {
+  label: string;
+  sublabel: string;
+  value: number;
+  tone: 'ours' | 'mine';
+}) {
   return (
-    <ThemedView type="backgroundElement" style={styles.summaryCard}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
+    <View style={[styles.summaryCard, { backgroundColor: Accent[tone] }, Shadow.card]}>
+      <ThemedText type="smallBold" style={styles.summaryLabel}>
         {label.toUpperCase()}
       </ThemedText>
-      <ThemedText type="subtitle" testID={`summary-${label.toLowerCase()}`}>
+      <ThemedText
+        type="subtitle"
+        testID={`summary-${label.toLowerCase()}`}
+        style={styles.summaryValue}>
         {formatAmount(value)}
       </ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
+      <ThemedText type="small" style={styles.summarySub}>
         {sublabel}
       </ThemedText>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -395,9 +420,15 @@ function TransactionRow({
           <ThemedText type="small" themeColor="textSecondary">
             {item.occurred_on}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {item.scope === 'shared' ? 'Ours' : 'Mine'}
-          </ThemedText>
+          <View
+            style={[
+              styles.scopeChip,
+              { backgroundColor: item.scope === 'shared' ? Accent.ours : Accent.mine },
+            ]}>
+            <ThemedText type="small" style={styles.scopeChipText}>
+              {item.scope === 'shared' ? 'Ours' : 'Mine'}
+            </ThemedText>
+          </View>
           {category ? (
             <View style={styles.rowCategory}>
               <View style={[styles.chipDot, { backgroundColor: category.color ?? '#60646c' }]} />
@@ -447,26 +478,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     marginBottom: Spacing.three,
   },
+  settleAvatars: { flexDirection: 'row' },
+  avatarOverlap: { marginLeft: -12 },
   settleMain: { flex: 1, gap: Spacing.half },
   settleButton: {
     backgroundColor: Accent.primary,
-    borderRadius: Spacing.two,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settleButtonText: { color: Accent.onPrimary },
+  settleButtonText: { color: Accent.onScope },
   budgetsCard: {
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.two,
     marginBottom: Spacing.three,
+    ...Shadow.card,
   },
   budgetRow: { gap: Spacing.one },
   budgetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
@@ -474,15 +508,19 @@ const styles = StyleSheet.create({
   overText: { color: Accent.danger },
   summaryCard: {
     flex: 1,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.half,
   },
+  summaryLabel: { color: 'rgba(255,255,255,0.85)' },
+  summaryValue: { color: '#ffffff' },
+  summarySub: { color: 'rgba(255,255,255,0.8)' },
   addCard: {
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.two,
     marginBottom: Spacing.three,
+    ...Shadow.card,
   },
   amountRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
   amountInput: {
@@ -533,14 +571,17 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.three,
+    ...Shadow.card,
   },
   rowMain: { flex: 1, gap: Spacing.half },
   rowDesc: { fontSize: 16 },
-  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
+  scopeChip: { paddingHorizontal: Spacing.two, paddingVertical: 1, borderRadius: Radius.pill },
+  scopeChipText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   rowCategory: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   rowAmount: { fontSize: 18, fontWeight: '700' },
   remove: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
