@@ -45,4 +45,13 @@ describe('HomeScreen', () => {
     fireEvent.press(screen.getByText('Sign out'));
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
   });
+
+  it('offers a Settings entry point', async () => {
+    mockUseHousehold.mockReturnValue({
+      household: { name: 'Our Home', invite_code: 'ABC123' },
+      members: [{ user_id: 'u1' }, { user_id: 'u2' }],
+    });
+    await render(<HomeScreen />);
+    expect(screen.getByLabelText('Settings')).toBeTruthy();
+  });
 });

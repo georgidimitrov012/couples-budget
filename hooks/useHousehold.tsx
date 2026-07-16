@@ -26,6 +26,7 @@ type HouseholdContextValue = {
   refresh: () => Promise<void>;
   createHousehold: (name?: string) => Promise<{ error: string | null }>;
   joinHousehold: (code: string) => Promise<{ error: string | null }>;
+  leaveHousehold: () => Promise<{ error: string | null }>;
 };
 
 const HouseholdContext = createContext<HouseholdContextValue | undefined>(undefined);
@@ -171,9 +172,20 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     [fetchMembers]
   );
 
+  // Exit the current household. The RPC cleans up server-side (deletes the
+  // household if we were the last member, otherwise hands it to the partner);
+  // clearing local state flips the (app) guard back to create/join onboarding.
+  const leaveHousehold = useCallback(async () => {
+    const { error: rpcErr } = await supabase.rpc('leave_household');
+    if (rpcErr) return { error: rpcErr.message };
+    setHousehold(null);
+    setMembers([]);
+    return { error: null };
+  }, []);
+
   return (
     <HouseholdContext.Provider
-      value={{ household, members, loading, error, refresh, createHousehold, joinHousehold }}>
+      value={{ household, members, loading, error, refresh, createHousehold, joinHousehold, leaveHousehold }}>
       {children}
     </HouseholdContext.Provider>
   );

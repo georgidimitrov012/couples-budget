@@ -365,6 +365,104 @@ grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.join_household(text)   to authenticated;
 
 -- ----------------------------------------------------------------
+-- RPCs: leave a household / delete your account
+--
+-- Removing yourself from a couple, or deleting your auth user, can't be a plain
+-- client DELETE: several tables reference auth.users(id) WITHOUT on-delete
+-- cascade (transactions, categories, settlements, receipts, list_items.added_by,
+-- households.created_by), so those rows must be cleaned up first, in order, or
+-- the delete is blocked by the FK.
+--
+-- Semantics (a household is a couple, max 2 members):
+--   * Last member leaving -> the whole household is deleted; cascade wipes all
+--     of its categories/transactions/lists/items/settlements/receipts.
+--   * A partner remains    -> the leaver's own ledger leaves with them: their
+--     transactions, settlements, receipts and categories are deleted. Shared
+--     shopping-list items they added transfer to the partner (added_by is NOT
+--     NULL and the shared list should survive), any checked_by they set is
+--     cleared, and household ownership (created_by) transfers to the partner.
+-- ----------------------------------------------------------------
+
+-- Internal: detach a user from every household they belong to, per the rules
+-- above. Takes the user id explicitly but is ONLY ever called with auth.uid()
+-- by the wrappers below; EXECUTE is revoked from callers so an authenticated
+-- user can't pass someone else's id and wipe their data.
+create or replace function public._detach_user_from_households(p_user uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  h_id         uuid;
+  partner      uuid;
+  member_count int;
+begin
+  for h_id in select household_id from public.household_members where user_id = p_user
+  loop
+    select count(*) into member_count
+      from public.household_members where household_id = h_id;
+
+    if member_count <= 1 then
+      -- Last member: dissolve the household; cascade removes everything under it.
+      delete from public.households where id = h_id;
+    else
+      -- Partner remains: the leaver's ledger goes, ownership transfers to them.
+      select user_id into partner
+        from public.household_members
+        where household_id = h_id and user_id <> p_user
+        limit 1;
+
+      delete from public.transactions where household_id = h_id and owner_id = p_user;
+      delete from public.settlements  where household_id = h_id and (from_user = p_user or to_user = p_user);
+      delete from public.receipts     where household_id = h_id and uploaded_by = p_user;
+      delete from public.categories   where household_id = h_id and owner_id = p_user;
+
+      update public.list_items set checked_by = null
+        where checked_by = p_user
+          and list_id in (select id from public.shopping_lists where household_id = h_id);
+      update public.list_items set added_by = partner
+        where added_by = p_user
+          and list_id in (select id from public.shopping_lists where household_id = h_id);
+
+      update public.households set created_by = partner
+        where id = h_id and created_by = p_user;
+
+      delete from public.household_members where household_id = h_id and user_id = p_user;
+    end if;
+  end loop;
+end;
+$$;
+
+-- Not for direct client use — the wrappers below call it as auth.uid() only.
+-- Revoke from anon/authenticated explicitly: Supabase's default privileges grant
+-- EXECUTE to those roles directly (not just via PUBLIC), so `from public` alone
+-- would leave the helper callable by any signed-in user with an arbitrary id.
+-- The SECURITY DEFINER wrappers still reach it — they run as the owner.
+revoke all on function public._detach_user_from_households(uuid) from public, anon, authenticated;
+
+create or replace function public.leave_household()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+  perform public._detach_user_from_households(auth.uid());
+end;
+$$;
+
+create or replace function public.delete_account()
+returns void language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+  perform public._detach_user_from_households(uid);
+  delete from auth.users where id = uid;  -- cascades profiles + household_members
+end;
+$$;
+
+grant execute on function public.leave_household() to authenticated;
+grant execute on function public.delete_account()  to authenticated;
+
+-- ----------------------------------------------------------------
 -- RPC: apply a reviewed receipt atomically. Runs as the caller (SECURITY
 -- INVOKER) so every insert/update still passes RLS. p_lines is the reviewed
 -- rows: [{ name, amount, scope, action, list_item_id }] where action is

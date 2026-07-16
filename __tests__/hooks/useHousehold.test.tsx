@@ -114,6 +114,35 @@ describe('useHousehold', () => {
     expect(res.error).toBe('This household is already full');
   });
 
+  it('leaveHousehold calls the RPC and clears the household', async () => {
+    const { result } = await renderHook(() => useHousehold(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.household?.id).toBe('h1');
+
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    let res: { error: string | null } = { error: 'unset' };
+    await act(async () => {
+      res = await result.current.leaveHousehold();
+    });
+    expect(mockRpc).toHaveBeenCalledWith('leave_household');
+    expect(res.error).toBeNull();
+    expect(result.current.household).toBeNull();
+    expect(result.current.members).toEqual([]);
+  });
+
+  it('leaveHousehold surfaces the RPC error and keeps the household', async () => {
+    const { result } = await renderHook(() => useHousehold(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'nope' } });
+    let res: { error: string | null } = { error: null };
+    await act(async () => {
+      res = await result.current.leaveHousehold();
+    });
+    expect(res.error).toBe('nope');
+    expect(result.current.household?.id).toBe('h1');
+  });
+
   it('subscribes to household_members realtime and reloads members on an event', async () => {
     const { result } = await renderHook(() => useHousehold(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));

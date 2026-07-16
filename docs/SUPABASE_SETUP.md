@@ -243,3 +243,43 @@ the review screen shows editable line items → adjust and **Submit** → the ex
 on the Budget tab (matched items get checked off), and the image + record appear under
 Storage → `receipts`. If extraction is weak on your receipts, bump `ANTHROPIC_MODEL` to a
 larger model and redeploy is **not** needed (secrets apply on next invocation).
+
+---
+
+## 7. Migration: leave-household + account deletion
+
+Adds the `leave_household()` and `delete_account()` RPCs (Apple requires in-app account
+deletion for App Store approval). Fresh projects get these from `schema.sql`; existing
+projects apply the block once in the SQL Editor — copy the three
+`create or replace function` blocks plus the `revoke` and `grant` lines from `schema.sql`,
+specifically:
+
+- `public._detach_user_from_households(uuid)` — internal cleanup helper, **immediately
+  followed by** `revoke all on function public._detach_user_from_households(uuid) from
+  public, anon, authenticated;` (critical: without the revoke, any signed-in user could call
+  it with another user's id and wipe their data — and it must name `anon, authenticated`
+  explicitly, because Supabase's default privileges grant EXECUTE to those roles directly,
+  so `from public` alone is not enough).
+- `public.leave_household()` + its `grant execute … to authenticated`.
+- `public.delete_account()` + its `grant execute … to authenticated`.
+
+Why an RPC and not a client `DELETE`: the app holds the **anon key only** and several
+tables reference `auth.users(id)` without on-delete cascade, so the rows must be removed
+in order. The functions are `SECURITY DEFINER` (they run as the `postgres` owner), which is
+what lets `delete_account()` remove the row from `auth.users`. Run the block in the SQL
+Editor as the project owner so the functions are owned by `postgres`.
+
+> If `delete_account()` ever errors with a permission problem on `auth.users`, the
+> fallback is an Edge Function using the service-role admin API (`auth.admin.deleteUser`);
+> not needed on a standard Supabase project where the SQL Editor runs as `postgres`.
+
+**Semantics** (a household is a couple, max 2): leaving as the **last** member deletes the
+whole household (cascade wipes its data); leaving while a **partner remains** deletes only
+*your* transactions/settlements/receipts/categories, transfers shared shopping-list items
+and household ownership to your partner, and removes your membership. `delete_account()`
+does the same cleanup, then deletes your auth user.
+
+**Smoke-test:** Home → **Settings** → **Leave household** returns you to the create/join
+onboarding screen (your partner keeps the household). **Delete account** signs you out to
+the auth screen and the account no longer exists (a re-sign-in fails). Then run
+`pnpm test:security` — the leave/delete isolation checks should pass.

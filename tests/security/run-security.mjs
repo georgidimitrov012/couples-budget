@@ -273,6 +273,83 @@ async function main() {
 
   const anonRead = await anon.from('households').select('id').eq('id', hh.id);
   check('unauthenticated cannot read households', (anonRead.data?.length ?? 0) === 0);
+
+  // --- leave-household / account deletion --------------------------------
+  // These are destructive, so they run last against their own fresh households.
+
+  // The internal cleanup helper must NOT be callable directly — otherwise any
+  // signed-in user could pass another user's id and wipe their data.
+  const detachDirect = await clientA.rpc('_detach_user_from_households', { p_user: b.id });
+  check('internal _detach helper is not callable by clients', detachDirect.error != null, detachDirect.error?.message ?? 'NO ERROR');
+
+  // D creates a household, E joins; D then leaves while E remains.
+  const d = await createUser('d', 'Dave');
+  const e = await createUser('e', 'Erin');
+  userIds.push(d.id, e.id);
+  const [clientD, clientE] = await Promise.all([authed(d.email), authed(e.email)]);
+  const { data: hhDE, error: deErr } = await clientD.rpc('create_household', { p_name: 'Leavers' });
+  if (deErr) throw new Error('create_household (D): ' + deErr.message);
+  householdIds.push(hhDE.id);
+  await clientE.rpc('join_household', { p_code: hhDE.invite_code });
+
+  const { data: dList } = await clientD.from('shopping_lists').insert({ household_id: hhDE.id, name: 'L' }).select().single();
+  const { data: dItem } = await clientD.from('list_items').insert({ list_id: dList.id, name: 'Bread', added_by: d.id }).select().single();
+  const { data: dTx } = await clientD
+    .from('transactions')
+    .insert({ household_id: hhDE.id, owner_id: d.id, amount: 8, description: 'D shared', scope: 'shared' })
+    .select()
+    .single();
+  const { data: eTx } = await clientE
+    .from('transactions')
+    .insert({ household_id: hhDE.id, owner_id: e.id, amount: 4, description: 'E shared', scope: 'shared' })
+    .select()
+    .single();
+
+  const dLeave = await clientD.rpc('leave_household');
+  check('member (D) can leave a household with a partner', dLeave.error == null, dLeave.error?.message ?? '');
+
+  const eMembers = await clientE.from('household_members').select('user_id').eq('household_id', hhDE.id);
+  check(
+    'leaver (D) is removed from membership; partner (E) remains',
+    (eMembers.data?.length ?? 0) === 1 && eMembers.data[0].user_id === e.id
+  );
+
+  const eSeesDTx = await clientE.from('transactions').select('id').eq('id', dTx.id);
+  check("the leaver's shared expenses are deleted", (eSeesDTx.data?.length ?? 0) === 0);
+
+  const eSeesOwnTx = await clientE.from('transactions').select('id').eq('id', eTx.id);
+  check("the partner's own expenses survive the leave", (eSeesOwnTx.data?.length ?? 0) === 1);
+
+  const eHh = await clientE.from('households').select('created_by').eq('id', hhDE.id);
+  check(
+    'household survives and ownership transfers to the partner',
+    (eHh.data?.length ?? 0) === 1 && eHh.data[0].created_by === e.id
+  );
+
+  const eItem = await clientE.from('list_items').select('added_by').eq('id', dItem.id);
+  check(
+    "the leaver's shared list items transfer to the partner",
+    (eItem.data?.length ?? 0) === 1 && eItem.data[0].added_by === e.id
+  );
+
+  // F is a solo household owner who deletes their entire account.
+  const f = await createUser('f', 'Fin');
+  userIds.push(f.id);
+  const clientF = await authed(f.email);
+  const { data: hhF, error: fErr } = await clientF.rpc('create_household', { p_name: 'Solo' });
+  if (fErr) throw new Error('create_household (F): ' + fErr.message);
+  householdIds.push(hhF.id);
+
+  const fDelete = await clientF.rpc('delete_account');
+  check('solo member can delete their account', fDelete.error == null, fDelete.error?.message ?? '');
+
+  const reSign = await mkClient(anonKey).auth.signInWithPassword({ email: f.email, password: pw });
+  check('a deleted account can no longer sign in', reSign.error != null, reSign.error?.message ?? 'NO ERROR');
+
+  if (admin) {
+    const hhFGone = await admin.from('households').select('id').eq('id', hhF.id);
+    check('delete_account dissolved the solo household', (hhFGone.data?.length ?? 0) === 0);
+  }
 }
 
 async function teardown() {
