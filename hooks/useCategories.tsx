@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import type { Update } from '../lib/db';
 import { useAuth } from './useAuth';
 import { useHousehold } from './useHousehold';
 
@@ -139,7 +140,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   // monthly limit; optimistic with snapshot restore on failure.
   const updateCategory = useCallback(
     async (cat: Category, patch: CategoryPatch) => {
-      const dbPatch: Record<string, unknown> = {};
+      const dbPatch: Update<'categories'> = {};
       const local: Partial<Category> = {};
       if (patch.name !== undefined) {
         dbPatch.name = patch.name;
