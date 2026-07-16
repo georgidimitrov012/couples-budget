@@ -431,7 +431,11 @@ end;
 $$;
 
 -- Not for direct client use — the wrappers below call it as auth.uid() only.
-revoke all on function public._detach_user_from_households(uuid) from public;
+-- Revoke from anon/authenticated explicitly: Supabase's default privileges grant
+-- EXECUTE to those roles directly (not just via PUBLIC), so `from public` alone
+-- would leave the helper callable by any signed-in user with an arbitrary id.
+-- The SECURITY DEFINER wrappers still reach it — they run as the owner.
+revoke all on function public._detach_user_from_households(uuid) from public, anon, authenticated;
 
 create or replace function public.leave_household()
 returns void language plpgsql security definer set search_path = public as $$

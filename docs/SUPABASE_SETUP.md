@@ -255,9 +255,11 @@ projects apply the block once in the SQL Editor — copy the three
 specifically:
 
 - `public._detach_user_from_households(uuid)` — internal cleanup helper, **immediately
-  followed by** `revoke all on function public._detach_user_from_households(uuid) from public;`
-  (critical: without the revoke, any signed-in user could call it with another user's id
-  and wipe their data).
+  followed by** `revoke all on function public._detach_user_from_households(uuid) from
+  public, anon, authenticated;` (critical: without the revoke, any signed-in user could call
+  it with another user's id and wipe their data — and it must name `anon, authenticated`
+  explicitly, because Supabase's default privileges grant EXECUTE to those roles directly,
+  so `from public` alone is not enough).
 - `public.leave_household()` + its `grant execute … to authenticated`.
 - `public.delete_account()` + its `grant execute … to authenticated`.
 
