@@ -133,7 +133,7 @@ export function useListItems(listId: string | null) {
           quantity: opts?.quantity ?? 1,
           price: opts?.price ?? null,
           category_id: opts?.categoryId ?? null,
-          added_by: uid,
+          added_by: uid ?? '',
         })
         .select()
         .single();

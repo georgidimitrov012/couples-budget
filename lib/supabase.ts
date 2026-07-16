@@ -3,10 +3,10 @@ import { AppState, Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
 import { ChunkedSecureStore } from './chunked-secure-store';
+import type { Database } from './database.types';
 
-// After you run `pnpm dlx supabase gen types typescript --project-id <ref> > lib/database.types.ts`,
-// import the generated type and switch to `createClient<Database>(...)` below for full type safety:
-//   import type { Database } from './database.types';
+// Regenerate `database.types.ts` after any schema change with `pnpm gen:types`
+// (wraps `supabase gen types typescript --project-id <ref>`).
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 // Accept either the modern "publishable" key or the legacy "anon" key name.
@@ -21,7 +21,7 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     // On web, leave storage undefined so supabase-js falls back to localStorage.
     storage: Platform.OS === 'web' ? undefined : (ChunkedSecureStore as any),

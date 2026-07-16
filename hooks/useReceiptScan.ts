@@ -83,9 +83,12 @@ export function useReceiptScan() {
       const { error: rpcError } = await supabase.rpc('apply_receipt', {
         p_household_id: householdId,
         p_image_path: path,
-        p_merchant: input.merchant,
-        p_purchased_on: input.purchasedOn,
-        p_currency: input.currency,
+        // The generator types function args as non-null, but apply_receipt
+        // tolerates null for these (nullif/coalesce in the RPC), and the review
+        // form can leave them empty — so keep passing null through.
+        p_merchant: input.merchant as string,
+        p_purchased_on: input.purchasedOn as string,
+        p_currency: input.currency as string,
         p_lines: input.lines,
       });
       if (rpcError) {
