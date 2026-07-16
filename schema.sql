@@ -10,13 +10,18 @@ create extension if not exists "pgcrypto";
 -- Helpers
 -- ----------------------------------------------------------------
 
--- Short, human-friendly invite code (6 hex chars, uppercased).
--- Uses gen_random_uuid() (core, in pg_catalog) rather than pgcrypto's
--- gen_random_bytes, which isn't on the search_path inside our SECURITY DEFINER
--- RPCs (Supabase installs pgcrypto in the `extensions` schema).
+-- Short, human-friendly invite code: 8 chars from a 31-char unambiguous
+-- alphabet (no 0/O/1/I/L to avoid mis-types) → ~8.5e11 combinations, a big
+-- jump from the old 6 hex chars (~16.7M). random() is adequate here — the win
+-- is the code space, and the join flow is human-mediated, not a secret token.
 create or replace function public.generate_invite_code()
 returns text language sql volatile as $$
-  select upper(substring(replace(gen_random_uuid()::text, '-', '') from 1 for 6));
+  select string_agg(
+    substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789',
+           1 + floor(random() * 31)::int, 1),
+    ''
+  )
+  from generate_series(1, 8);
 $$;
 
 -- ----------------------------------------------------------------
@@ -363,6 +368,27 @@ $$;
 
 grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.join_household(text)   to authenticated;
+
+-- Owner-only: rotate the household's invite code on demand (e.g. if a code
+-- leaks). Runs as definer; the WHERE created_by = auth.uid() is what enforces
+-- "owner only" — a partner or outsider matches no row and gets the exception.
+create or replace function public.regenerate_invite_code()
+returns public.households
+language plpgsql security definer set search_path = public as $$
+declare h public.households;
+begin
+  update public.households
+     set invite_code = public.generate_invite_code()
+   where created_by = auth.uid()
+   returning * into h;
+  if h.id is null then
+    raise exception 'Only the household owner can regenerate the invite code';
+  end if;
+  return h;
+end;
+$$;
+
+grant execute on function public.regenerate_invite_code() to authenticated;
 
 -- ----------------------------------------------------------------
 -- RPCs: leave a household / delete your account

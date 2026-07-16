@@ -106,7 +106,7 @@ async function main() {
     .single();
 
   // --- Assertions ---
-  check('invite code matches 6-char A-Z0-9 format', /^[A-Z0-9]{6}$/.test(hh.invite_code || ''), hh.invite_code);
+  check('invite code matches the strong 8-char format', /^[A-Z2-9]{8}$/.test(hh.invite_code || ''), hh.invite_code);
 
   const bReadHh = await clientB.from('households').select('id').eq('id', hh.id);
   check('member (B) can read the shared household', (bReadHh.data?.length ?? 0) === 1);
@@ -273,6 +273,22 @@ async function main() {
 
   const anonRead = await anon.from('households').select('id').eq('id', hh.id);
   check('unauthenticated cannot read households', (anonRead.data?.length ?? 0) === 0);
+
+  // --- invite-code regeneration (owner-only) -----------------------------
+  const oldCode = hh.invite_code;
+  const aRegen = await clientA.rpc('regenerate_invite_code');
+  check(
+    'owner (A) can regenerate the invite code (and it changes)',
+    aRegen.error == null && !!aRegen.data?.invite_code && aRegen.data.invite_code !== oldCode,
+    aRegen.error?.message ?? aRegen.data?.invite_code
+  );
+  check('the regenerated code matches the strong 8-char format', /^[A-Z2-9]{8}$/.test(aRegen.data?.invite_code || ''), aRegen.data?.invite_code);
+
+  const bRegen = await clientB.rpc('regenerate_invite_code');
+  check('co-member (B, not owner) cannot regenerate the code', bRegen.error != null, bRegen.error?.message ?? 'NO ERROR');
+
+  const cRegen = await clientC.rpc('regenerate_invite_code');
+  check('outsider (C) cannot regenerate a code', cRegen.error != null, cRegen.error?.message ?? 'NO ERROR');
 
   // --- leave-household / account deletion --------------------------------
   // These are destructive, so they run last against their own fresh households.

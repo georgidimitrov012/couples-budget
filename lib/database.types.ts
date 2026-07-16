@@ -441,6 +441,22 @@ export type Database = {
         }
       }
       leave_household: { Args: never; Returns: undefined }
+      regenerate_invite_code: {
+        Args: never
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string
+          name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "households"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       shares_household_with: { Args: { other: string }; Returns: boolean }
     }
     Enums: {

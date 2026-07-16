@@ -46,7 +46,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "gen:types": "supabase gen types typescript --project-id tsmhvhhrluwupcyoiyoq > lib/database.types.ts",
+    "gen:types": "pnpm dlx supabase gen types typescript --project-id tsmhvhhrluwupcyoiyoq > lib/database.types.ts",
     "test": "jest",
     "test:security": "node tests/security/run-security.mjs",
     "test:all": "jest && node tests/security/run-security.mjs"
