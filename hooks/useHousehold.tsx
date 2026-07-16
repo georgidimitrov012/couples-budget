@@ -27,6 +27,7 @@ type HouseholdContextValue = {
   createHousehold: (name?: string) => Promise<{ error: string | null }>;
   joinHousehold: (code: string) => Promise<{ error: string | null }>;
   leaveHousehold: () => Promise<{ error: string | null }>;
+  regenerateInviteCode: () => Promise<{ error: string | null }>;
 };
 
 const HouseholdContext = createContext<HouseholdContextValue | undefined>(undefined);
@@ -183,9 +184,18 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, []);
 
+  // Owner-only: rotate the invite code (e.g. if it leaked). The RPC returns the
+  // updated household row; swap it in so the new code shows immediately.
+  const regenerateInviteCode = useCallback(async () => {
+    const { data, error: rpcErr } = await supabase.rpc('regenerate_invite_code');
+    if (rpcErr) return { error: rpcErr.message };
+    setHousehold(data as Household);
+    return { error: null };
+  }, []);
+
   return (
     <HouseholdContext.Provider
-      value={{ household, members, loading, error, refresh, createHousehold, joinHousehold, leaveHousehold }}>
+      value={{ household, members, loading, error, refresh, createHousehold, joinHousehold, leaveHousehold, regenerateInviteCode }}>
       {children}
     </HouseholdContext.Provider>
   );

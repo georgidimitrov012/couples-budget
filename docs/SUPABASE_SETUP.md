@@ -283,3 +283,28 @@ does the same cleanup, then deletes your auth user.
 onboarding screen (your partner keeps the household). **Delete account** signs you out to
 the auth screen and the account no longer exists (a re-sign-in fails). Then run
 `pnpm test:security` — the leave/delete isolation checks should pass.
+
+---
+
+## 8. Migration: stronger invite codes + regenerate
+
+Hardens the invite code. Fresh projects get this from `schema.sql`; existing projects apply
+it once in the SQL Editor — copy the two `create or replace function` blocks (plus the
+`grant`) from `schema.sql`:
+
+- `public.generate_invite_code()` — now **8 chars from a 31-char unambiguous alphabet**
+  (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`, no `0/O/1/I/L`) → ~8.5e11 combinations, up from the
+  old 6 hex chars (~16.7M). Only *newly generated* codes change; existing households keep
+  their current code (it still works for joining).
+- `public.regenerate_invite_code()` + its `grant execute … to authenticated` — **owner-only**
+  rotation (the `where created_by = auth.uid()` enforces it; a partner/outsider matches no
+  row and gets an exception).
+
+This changes no existing data — it redefines one function and adds another.
+
+> Join throttling is intentionally deferred: real rate-limiting needs extra infrastructure,
+> and the ~8.5e11 code space makes brute-forcing impractical. Noted in the roadmap.
+
+**Smoke-test:** on Home while waiting for your partner, tap **Regenerate code** → the
+displayed code changes to a new 8-char code. Then run `pnpm test:security` — the invite-code
+format + regeneration checks should pass.

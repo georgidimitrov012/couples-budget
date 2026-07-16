@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, userEvent, waitFor } from '@testing-library/react-native';
 
 const mockUseHousehold = jest.fn();
 const mockSignOut = jest.fn();
@@ -53,5 +53,18 @@ describe('HomeScreen', () => {
     });
     await render(<HomeScreen />);
     expect(screen.getByLabelText('Settings')).toBeTruthy();
+  });
+
+  it('regenerates the invite code from the waiting state', async () => {
+    const regenerateInviteCode = jest.fn().mockResolvedValue({ error: null });
+    mockUseHousehold.mockReturnValue({
+      household: { name: 'Our Home', invite_code: 'ABCD2345' },
+      members: [{ user_id: 'u1' }],
+      regenerateInviteCode,
+    });
+    const user = userEvent.setup();
+    await render(<HomeScreen />);
+    await user.press(screen.getByLabelText('Regenerate code'));
+    await waitFor(() => expect(regenerateInviteCode).toHaveBeenCalled());
   });
 });

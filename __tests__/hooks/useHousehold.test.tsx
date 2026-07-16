@@ -143,6 +143,24 @@ describe('useHousehold', () => {
     expect(result.current.household?.id).toBe('h1');
   });
 
+  it('regenerateInviteCode calls the RPC and swaps in the new code', async () => {
+    const { result } = await renderHook(() => useHousehold(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.household?.invite_code).toBe('ABC123');
+
+    mockRpc.mockResolvedValue({
+      data: { id: 'h1', name: 'Home', invite_code: 'WXYZ2345', created_by: 'u1', created_at: 't0' },
+      error: null,
+    });
+    let res: { error: string | null } = { error: 'unset' };
+    await act(async () => {
+      res = await result.current.regenerateInviteCode();
+    });
+    expect(mockRpc).toHaveBeenCalledWith('regenerate_invite_code');
+    expect(res.error).toBeNull();
+    expect(result.current.household?.invite_code).toBe('WXYZ2345');
+  });
+
   it('subscribes to household_members realtime and reloads members on an event', async () => {
     const { result } = await renderHook(() => useHousehold(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));

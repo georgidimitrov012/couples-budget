@@ -14,8 +14,9 @@ import { supabase } from '../../../../lib/supabase';
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { household, members } = useHousehold();
+  const { household, members, regenerateInviteCode } = useHousehold();
   const [signingOut, setSigningOut] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const displayName =
     (user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? 'there';
@@ -26,6 +27,13 @@ export default function HomeScreen() {
     setSigningOut(true);
     const { error } = await supabase.auth.signOut();
     if (error) setSigningOut(false);
+  }
+
+  async function handleRegenerate() {
+    if (regenerating) return;
+    setRegenerating(true);
+    await regenerateInviteCode();
+    setRegenerating(false);
   }
 
   return (
@@ -69,6 +77,21 @@ export default function HomeScreen() {
                   Waiting for your partner to join…
                 </ThemedText>
               </View>
+              <Pressable
+                onPress={handleRegenerate}
+                disabled={regenerating}
+                accessibilityRole="button"
+                accessibilityLabel="Regenerate code"
+                hitSlop={8}
+                style={({ pressed }) => (pressed || regenerating) && styles.pressed}>
+                {regenerating ? (
+                  <ActivityIndicator size="small" color={Accent.primary} />
+                ) : (
+                  <ThemedText type="small" style={styles.regenerateText}>
+                    Regenerate code
+                  </ThemedText>
+                )}
+              </Pressable>
             </ThemedView>
           ) : (
             <ThemedText themeColor="textSecondary" style={styles.centerText}>
@@ -113,8 +136,9 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: Radius.xl,
   },
-  code: { fontSize: 44, fontWeight: '800', letterSpacing: 8 },
+  code: { fontSize: 40, fontWeight: '800', letterSpacing: 6 },
   waitingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  regenerateText: { color: Accent.primary, fontWeight: '600' },
   signOut: { paddingVertical: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   signOutText: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
 });
