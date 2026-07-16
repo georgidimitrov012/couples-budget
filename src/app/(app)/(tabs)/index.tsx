@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import { useHousehold } from '../../../../hooks/useHousehold';
 import { supabase } from '../../../../lib/supabase';
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { household, members } = useHousehold();
   const [signingOut, setSigningOut] = useState(false);
@@ -29,6 +31,17 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            hitSlop={8}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedText style={styles.settingsLink}>Settings</ThemedText>
+          </Pressable>
+        </View>
+
         <View style={styles.content}>
           <View style={styles.greeting}>
             <Avatar name={displayName} color={Accent.ours} size={64} />
@@ -87,6 +100,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
   },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: Spacing.two },
+  settingsLink: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
+  pressed: { opacity: 0.6 },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.four },
   greeting: { gap: Spacing.two, alignItems: 'center' },
   centerText: { textAlign: 'center' },
