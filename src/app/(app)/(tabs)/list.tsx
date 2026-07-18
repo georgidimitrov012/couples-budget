@@ -1,4 +1,3 @@
-import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -76,17 +75,8 @@ export default function ListScreen() {
                   </ThemedText>
                 </Pressable>
               )}
-              <Link href="/receipt" asChild>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Scan receipt"
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
-                  <ThemedText type="smallBold" style={styles.scanLink}>
-                    Scan receipt
-                  </ThemedText>
-                </Pressable>
-              </Link>
+              {/* Receipt scanning is shelved (native crash on the standalone build);
+                  entry point removed until it's reworked. See src/app/(app)/receipt.tsx. */}
             </View>
           </View>
 
@@ -259,7 +249,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.three,
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  scanLink: { color: Accent.primary },
   pressed: { opacity: 0.6 },
   banner: {
     borderRadius: Spacing.three,
