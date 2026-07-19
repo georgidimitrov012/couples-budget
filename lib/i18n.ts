@@ -166,6 +166,19 @@ const en: Dict = {
   'settings.leaveFailed': 'Could not leave',
   'settings.deleteFailed': 'Could not delete account',
 
+  // First-run explainer
+  'intro.title': 'How this works',
+  'intro.oursTitle': 'Ours & Mine',
+  'intro.oursBody':
+    'Tag each expense as Ours (shared, split 50/50) or Mine (private). The budget keeps them apart and shows who owes whom.',
+  'intro.listTitle': 'A shared shopping list',
+  'intro.listBody':
+    'Add what you need — item, quantity, aisle. It updates live on both phones, no price needed.',
+  'intro.linkTitle': 'List meets budget',
+  'intro.linkBody':
+    'Bought something? Log it in Budget and it ticks off your list. Buy fewer than planned and the rest stays.',
+  'intro.gotIt': 'Got it',
+
   // Grocery aisle labels (keyed by GroceryCategoryKey)
   'grocery.produce': 'Vegetables',
   'grocery.fruit': 'Fruit',
@@ -381,6 +394,19 @@ const bg: Dict = {
   'settings.deleteConfirm': 'Изтрий профила',
   'settings.leaveFailed': 'Неуспешно напускане',
   'settings.deleteFailed': 'Неуспешно изтриване на профила',
+
+  // First-run explainer
+  'intro.title': 'Как работи',
+  'intro.oursTitle': 'Общи и Лични',
+  'intro.oursBody':
+    'Отбелязвай всеки разход като Общ (споделен, разделен 50/50) или Личен (само твой). Бюджетът ги разделя и показва кой на кого дължи.',
+  'intro.listTitle': 'Общ списък за пазаруване',
+  'intro.listBody':
+    'Добавяй каквото ти трябва — продукт, количество, раздел. Обновява се на живо и на двата телефона, без цена.',
+  'intro.linkTitle': 'Списък и бюджет заедно',
+  'intro.linkBody':
+    'Купи ли нещо? Запиши го в Бюджет и то се отмята от списъка. Купиш ли по-малко, остатъкът остава.',
+  'intro.gotIt': 'Разбрах',
 
   // Grocery aisle labels
   'grocery.produce': 'Зеленчуци',
