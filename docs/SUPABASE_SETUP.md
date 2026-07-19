@@ -308,3 +308,27 @@ This changes no existing data — it redefines one function and adds another.
 **Smoke-test:** on Home while waiting for your partner, tap **Regenerate code** → the
 displayed code changes to a new 8-char code. Then run `pnpm test:security` — the invite-code
 format + regeneration checks should pass.
+
+---
+
+> §9 (DB check constraints — `amount > 0`, `quantity > 0`, `monthly_limit >= 0`) is built
+> but parked on branch `feat/db-check-constraints`; apply it from there if/when that merges.
+
+---
+
+## 10. Migration: shopping-list category (v2 grocery rework)
+
+Adds a `category` column to `list_items` so the shopping list can group items by grocery
+aisle (Vegetables, Dairy, Bakery…). The categories themselves are app-defined constants in
+`lib/groceries.ts` (with emoji icons) — this column just stores the key. Fresh projects get
+it inline from `schema.sql`; existing projects apply it once in the SQL Editor:
+
+```sql
+alter table public.list_items add column category text;
+```
+
+Safe and instant: it adds one nullable column and touches no existing data (older items read
+back as "Other" until re-categorized). After applying, regenerate types with `pnpm gen:types`.
+
+**Smoke-test:** on the List tab, add "Bread" → it appears under a **🥖 Bakery** group; the
+price field is gone and items carry a quantity stepper.

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
+  SectionList,
   StyleSheet,
   TextInput,
   View,
@@ -15,9 +16,42 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatAmount, parseAmount } from '../../../../lib/format';
+import {
+  categorize,
+  categoryFor,
+  COMMON_ITEMS,
+  GROCERY_CATEGORIES,
+  type CommonItem,
+  type GroceryCategory,
+} from '../../../../lib/groceries';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useShoppingList } from '../../../../hooks/useShoppingList';
+
+type Section = { category: GroceryCategory; data: ListItem[] };
+
+// Group items by grocery category (in taxonomy order); within a group, still-needed
+// items first, checked-off ones sink to the bottom.
+function buildSections(items: ListItem[]): Section[] {
+  const byKey = new Map<string, ListItem[]>();
+  for (const it of items) {
+    const key = categoryFor(it.category).key;
+    (byKey.get(key) ?? byKey.set(key, []).get(key)!).push(it);
+  }
+  const sections: Section[] = [];
+  for (const category of GROCERY_CATEGORIES) {
+    const group = byKey.get(category.key);
+    if (!group || group.length === 0) continue;
+    const data = [...group].sort((a, b) =>
+      a.is_checked !== b.is_checked
+        ? a.is_checked
+          ? 1
+          : -1
+        : a.created_at.localeCompare(b.created_at)
+    );
+    sections.push({ category, data });
+  }
+  return sections;
+}
 
 export default function ListScreen() {
   const theme = useTheme();
@@ -28,29 +62,40 @@ export default function ListScreen() {
     error: itemsError,
     addItem,
     toggleItem,
+    setQuantity,
     removeItem,
     clearChecked,
     retry: retryItems,
   } = useListItems(listId);
   const [draft, setDraft] = useState('');
-  const [priceDraft, setPriceDraft] = useState('');
+  const [showCatalog, setShowCatalog] = useState(false);
 
   const error = listError ?? itemsError;
   const loading = listLoading || (itemsLoading && items.length === 0);
   const canAdd = draft.trim().length > 0 && !!listId;
   const checkedCount = items.filter((i) => i.is_checked).length;
+  const sections = useMemo(() => buildSections(items), [items]);
+  const activeNames = useMemo(
+    () => new Set(items.filter((i) => !i.is_checked).map((i) => i.name.toLowerCase())),
+    [items]
+  );
 
   async function handleAdd() {
     if (!canAdd) return;
     const name = draft.trim();
-    const price = parseAmount(priceDraft);
     setDraft('');
-    setPriceDraft('');
-    if (price != null) await addItem(name, { price });
-    else await addItem(name);
+    await addItem(name, { category: categorize(name) });
   }
 
-  // A load error can live in either hook (resolving the list vs. its items).
+  // Adding a common item that's already on the list just bumps its quantity.
+  function addCommon(common: CommonItem) {
+    const existing = items.find(
+      (i) => !i.is_checked && i.name.toLowerCase() === common.name.toLowerCase()
+    );
+    if (existing) setQuantity(existing, existing.quantity + 1);
+    else addItem(common.name, { category: common.category });
+  }
+
   function handleRetry() {
     retryList();
     retryItems();
@@ -62,22 +107,18 @@ export default function ListScreen() {
         <View style={styles.inner}>
           <View style={styles.header}>
             <ThemedText type="subtitle">Shopping list</ThemedText>
-            <View style={styles.headerActions}>
-              {checkedCount > 0 && (
-                <Pressable
-                  onPress={clearChecked}
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear checked items"
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Clear checked ({checkedCount})
-                  </ThemedText>
-                </Pressable>
-              )}
-              {/* Receipt scanning is shelved (native crash on the standalone build);
-                  entry point removed until it's reworked. See src/app/(app)/receipt.tsx. */}
-            </View>
+            {checkedCount > 0 && (
+              <Pressable
+                onPress={clearChecked}
+                accessibilityRole="button"
+                accessibilityLabel="Clear checked items"
+                hitSlop={8}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Clear checked ({checkedCount})
+                </ThemedText>
+              </Pressable>
+            )}
           </View>
 
           {error && (
@@ -94,74 +135,75 @@ export default function ListScreen() {
             </Pressable>
           )}
 
+          <View style={styles.addRow}>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  color: theme.text,
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.backgroundSelected,
+                },
+              ]}
+              placeholder="Add an item…"
+              placeholderTextColor={theme.textSecondary}
+              value={draft}
+              onChangeText={setDraft}
+              editable={!!listId}
+              returnKeyType="done"
+              onSubmitEditing={handleAdd}
+            />
+            <Pressable
+              onPress={handleAdd}
+              disabled={!canAdd}
+              accessibilityRole="button"
+              accessibilityLabel="Add item"
+              style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
+              <ThemedText style={styles.addButtonText}>+</ThemedText>
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={() => setShowCatalog((s) => !s)}
+            accessibilityRole="button"
+            accessibilityLabel="Browse common items"
+            style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
+            <ThemedText type="smallBold" style={styles.catalogToggleText}>
+              {showCatalog ? '✕  Hide common items' : '✨  Common items'}
+            </ThemedText>
+          </Pressable>
+
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.flex}>
-            <View style={styles.addRow}>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.backgroundSelected,
-                  },
-                ]}
-                placeholder="Add an item…"
-                placeholderTextColor={theme.textSecondary}
-                value={draft}
-                onChangeText={setDraft}
-                editable={!!listId}
-                returnKeyType="done"
-                onSubmitEditing={handleAdd}
-              />
-              <TextInput
-                style={[
-                  styles.priceInput,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.backgroundSelected,
-                  },
-                ]}
-                placeholder="Price"
-                placeholderTextColor={theme.textSecondary}
-                value={priceDraft}
-                onChangeText={setPriceDraft}
-                editable={!!listId}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                onSubmitEditing={handleAdd}
-              />
-              <Pressable
-                onPress={handleAdd}
-                disabled={!canAdd}
-                accessibilityRole="button"
-                accessibilityLabel="Add item"
-                style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
-                <ThemedText style={styles.addButtonText}>+</ThemedText>
-              </Pressable>
-            </View>
-
-            {loading ? (
+            {showCatalog ? (
+              <Catalog activeNames={activeNames} onAdd={addCommon} />
+            ) : loading ? (
               <View style={styles.center}>
                 <ActivityIndicator testID="list-loading" />
               </View>
             ) : items.length === 0 ? (
               <View style={styles.center}>
                 <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                  No items yet.{'\n'}Add your first one above.
+                  Your list is empty.{'\n'}Type an item above, or tap “Common items”.
                 </ThemedText>
               </View>
             ) : (
-              <FlatList
-                data={items}
+              <SectionList
+                sections={sections}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
+                stickySectionHeadersEnabled={false}
+                renderSectionHeader={({ section }) => (
+                  <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeader}>
+                    {section.category.emoji}  {section.category.label.toUpperCase()}
+                  </ThemedText>
+                )}
                 renderItem={({ item }) => (
                   <ListRow
                     item={item}
                     onToggle={() => toggleItem(item)}
+                    onQuantity={(n) => setQuantity(item, n)}
                     onRemove={() => removeItem(item)}
                   />
                 )}
@@ -174,13 +216,67 @@ export default function ListScreen() {
   );
 }
 
+function Catalog({
+  activeNames,
+  onAdd,
+}: {
+  activeNames: Set<string>;
+  onAdd: (item: CommonItem) => void;
+}) {
+  const theme = useTheme();
+  // A small static catalog — a ScrollView renders every chip (no virtualization),
+  // so nothing is hidden until scrolled into view.
+  return (
+    <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
+      {GROCERY_CATEGORIES.map((category) => {
+        const options = COMMON_ITEMS.filter((c) => c.category === category.key);
+        if (options.length === 0) return null;
+        return (
+          <View key={category.key} style={styles.catalogGroup}>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeader}>
+              {category.emoji}  {category.label.toUpperCase()}
+            </ThemedText>
+            <View style={styles.chipWrap}>
+              {options.map((common) => {
+                const added = activeNames.has(common.name.toLowerCase());
+                return (
+                  <Pressable
+                    key={common.name}
+                    onPress={() => onAdd(common)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${common.name}`}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      { borderColor: theme.backgroundSelected, backgroundColor: theme.backgroundElement },
+                      added && { backgroundColor: theme.tint, borderColor: Accent.primary },
+                      pressed && styles.pressed,
+                    ]}>
+                    <ThemedText
+                      type="small"
+                      style={added ? { color: Accent.primary, fontWeight: '700' } : undefined}>
+                      {added ? '✓ ' : '+ '}
+                      {common.name}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function ListRow({
   item,
   onToggle,
+  onQuantity,
   onRemove,
 }: {
   item: ListItem;
   onToggle: () => void;
+  onQuantity: (n: number) => void;
   onRemove: () => void;
 }) {
   const theme = useTheme();
@@ -203,18 +299,35 @@ function ListRow({
         </View>
         <ThemedText
           themeColor={item.is_checked ? 'textSecondary' : 'text'}
+          numberOfLines={1}
           style={[styles.itemName, item.is_checked && styles.itemNameChecked]}>
           {item.name}
-          {item.quantity > 1 ? `  ×${item.quantity}` : ''}
         </ThemedText>
-        {item.price != null && (
-          <View style={[styles.pricePill, { backgroundColor: theme.background }]}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.pricePillText}>
-              {formatAmount(item.price)}
-            </ThemedText>
-          </View>
-        )}
       </Pressable>
+
+      {item.is_checked ? null : (
+        <View style={styles.stepper}>
+          <Pressable
+            onPress={() => onQuantity(item.quantity - 1)}
+            disabled={item.quantity <= 1}
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease ${item.name}`}
+            hitSlop={6}
+            style={({ pressed }) => [styles.stepBtn, { opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 }]}>
+            <ThemedText style={styles.stepBtnText}>−</ThemedText>
+          </Pressable>
+          <ThemedText style={styles.stepValue}>{item.quantity}</ThemedText>
+          <Pressable
+            onPress={() => onQuantity(item.quantity + 1)}
+            accessibilityRole="button"
+            accessibilityLabel={`Increase ${item.name}`}
+            hitSlop={6}
+            style={({ pressed }) => [styles.stepBtn, pressed && styles.pressed]}>
+            <ThemedText style={styles.stepBtnText}>＋</ThemedText>
+          </Pressable>
+        </View>
+      )}
+
       <Pressable
         onPress={onRemove}
         accessibilityRole="button"
@@ -248,7 +361,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   pressed: { opacity: 0.6 },
   banner: {
     borderRadius: Spacing.three,
@@ -257,7 +369,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   bannerText: { color: Accent.danger },
-  addRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
+  addRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two },
   input: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
@@ -265,15 +377,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     fontSize: 16,
-  },
-  priceInput: {
-    width: 84,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
-    textAlign: 'right',
   },
   addButton: {
     backgroundColor: Accent.primary,
@@ -284,9 +387,20 @@ const styles = StyleSheet.create({
     ...Shadow.card,
   },
   addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 26, lineHeight: 30 },
+  catalogToggle: { paddingVertical: Spacing.two, marginBottom: Spacing.one },
+  catalogToggleText: { color: Accent.primary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
-  listContent: { gap: Spacing.two, paddingVertical: Spacing.one },
+  listContent: { paddingBottom: Spacing.four, gap: Spacing.two },
+  sectionHeader: { marginTop: Spacing.three, marginBottom: Spacing.one, letterSpacing: 0.5 },
+  catalogGroup: { gap: Spacing.one },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  chip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,8 +410,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     ...Shadow.card,
   },
-  pricePill: { paddingHorizontal: Spacing.two, paddingVertical: 3, borderRadius: Radius.pill },
-  pricePillText: { fontWeight: '700', fontVariant: ['tabular-nums'] },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   checkbox: {
     width: 24,
@@ -311,5 +423,9 @@ const styles = StyleSheet.create({
   checkmark: { color: Accent.onPrimary, fontSize: 14, fontWeight: '700', lineHeight: 16 },
   itemName: { flex: 1, fontSize: 16 },
   itemNameChecked: { textDecorationLine: 'line-through' },
-  remove: { paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  stepBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  stepBtnText: { fontSize: 20, fontWeight: '700', lineHeight: 22, color: Accent.primary },
+  stepValue: { fontSize: 16, fontWeight: '700', minWidth: 18, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  remove: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
 });
