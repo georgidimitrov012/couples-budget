@@ -16,11 +16,13 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useHousehold } from '../../../../hooks/useHousehold';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 const CODE_LENGTH = 6;
 
 export default function JoinHouseholdScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { joinHousehold } = useHousehold();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function JoinHouseholdScreen() {
     if (loading) return;
     setError(null);
     if (code.trim().length < CODE_LENGTH) {
-      setError(`Enter your ${CODE_LENGTH}-character invite code.`);
+      setError(t('error.enterCode', { length: CODE_LENGTH }));
       return;
     }
     setLoading(true);
@@ -51,10 +53,8 @@ export default function JoinHouseholdScreen() {
           style={styles.flex}>
           <View style={styles.form}>
             <View style={styles.header}>
-              <ThemedText type="subtitle">Join a household</ThemedText>
-              <ThemedText themeColor="textSecondary">
-                Enter the 6-character code your partner shared with you.
-              </ThemedText>
+              <ThemedText type="subtitle">{t('join.title')}</ThemedText>
+              <ThemedText themeColor="textSecondary">{t('join.subtitle')}</ThemedText>
             </View>
 
             <TextInput
@@ -91,14 +91,14 @@ export default function JoinHouseholdScreen() {
               {loading ? (
                 <ActivityIndicator color={Accent.onPrimary} />
               ) : (
-                <ThemedText style={styles.buttonText}>Join household</ThemedText>
+                <ThemedText style={styles.buttonText}>{t('join.button')}</ThemedText>
               )}
             </Pressable>
 
             <Link href="/welcome" asChild>
               <Pressable disabled={loading} style={styles.back}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Back
+                  {t('common.back')}
                 </ThemedText>
               </Pressable>
             </Link>

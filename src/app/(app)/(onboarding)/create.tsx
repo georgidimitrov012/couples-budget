@@ -16,9 +16,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useHousehold } from '../../../../hooks/useHousehold';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 export default function CreateHouseholdScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { createHousehold } = useHousehold();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,11 +47,8 @@ export default function CreateHouseholdScreen() {
           style={styles.flex}>
           <View style={styles.form}>
             <View style={styles.header}>
-              <ThemedText type="subtitle">Create a household</ThemedText>
-              <ThemedText themeColor="textSecondary">
-                Give it a name (or keep the default). You&apos;ll get an invite code to share with
-                your partner.
-              </ThemedText>
+              <ThemedText type="subtitle">{t('create.title')}</ThemedText>
+              <ThemedText themeColor="textSecondary">{t('create.subtitle')}</ThemedText>
             </View>
 
             <TextInput
@@ -61,7 +60,7 @@ export default function CreateHouseholdScreen() {
                   borderColor: theme.backgroundSelected,
                 },
               ]}
-              placeholder="Household name (optional)"
+              placeholder={t('create.namePlaceholder')}
               placeholderTextColor={theme.textSecondary}
               value={name}
               onChangeText={setName}
@@ -84,14 +83,14 @@ export default function CreateHouseholdScreen() {
               {loading ? (
                 <ActivityIndicator color={Accent.onPrimary} />
               ) : (
-                <ThemedText style={styles.buttonText}>Create household</ThemedText>
+                <ThemedText style={styles.buttonText}>{t('create.button')}</ThemedText>
               )}
             </Pressable>
 
             <Link href="/welcome" asChild>
               <Pressable disabled={loading} style={styles.back}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Back
+                  {t('common.back')}
                 </ThemedText>
               </Pressable>
             </Link>

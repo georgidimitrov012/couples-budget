@@ -2,7 +2,11 @@
 //
 // Categories are app-defined constants (not per-household DB rows): a fixed,
 // curated set of shopping aisles with emoji icons. `list_items.category` stores
-// the key. Labels here are English; Phase 4 (i18n) will translate them by key.
+// the key. The `label`/`name` fields here are the English source strings and act
+// as fallbacks; the UI shows the localized value via i18n keys `grocery.<key>`
+// and `item.<slug>` (see lib/i18n.ts). itemSlug() maps a catalog name to its key.
+
+import { translations } from './i18n';
 
 export type GroceryCategoryKey =
   | 'produce'
@@ -117,15 +121,28 @@ export const COMMON_ITEMS: CommonItem[] = [
   { name: 'Soap', category: 'personal' },
 ];
 
-const COMMON_BY_NAME: Record<string, GroceryCategoryKey> = COMMON_ITEMS.reduce(
-  (acc, i) => ({ ...acc, [i.name.toLowerCase()]: i.category }),
-  {} as Record<string, GroceryCategoryKey>
-);
+/** The i18n key slug for a catalog item name (see `item.<slug>` in lib/i18n). */
+export function itemSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Reverse lookup name -> aisle, in BOTH languages: the English catalog name plus
+// its Bulgarian translation, so a free-typed item categorizes correctly whatever
+// language the user is in.
+const COMMON_BY_NAME: Record<string, GroceryCategoryKey> = (() => {
+  const map: Record<string, GroceryCategoryKey> = {};
+  for (const item of COMMON_ITEMS) {
+    map[item.name.toLowerCase()] = item.category;
+    const bg = translations.bg[`item.${itemSlug(item.name)}`];
+    if (bg) map[bg.toLowerCase()] = item.category;
+  }
+  return map;
+})();
 
 /**
  * Best-effort category for a free-typed item: an exact catalog match first,
  * then a word/substring match, else "Other". Keeps grouping sensible without
- * making the user pick a category for every item.
+ * making the user pick a category for every item. Matches English and Bulgarian.
  */
 export function categorize(name: string): GroceryCategoryKey {
   const n = name.trim().toLowerCase();

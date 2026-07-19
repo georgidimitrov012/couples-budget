@@ -21,11 +21,13 @@ import {
   categoryFor,
   COMMON_ITEMS,
   GROCERY_CATEGORIES,
+  itemSlug,
   type CommonItem,
   type GroceryCategory,
 } from '../../../../lib/groceries';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useShoppingList } from '../../../../hooks/useShoppingList';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 type Section = { category: GroceryCategory; data: ListItem[] };
 
@@ -55,6 +57,7 @@ function buildSections(items: ListItem[]): Section[] {
 
 export default function ListScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { listId, loading: listLoading, error: listError, retry: retryList } = useShoppingList();
   const {
     items,
@@ -88,12 +91,14 @@ export default function ListScreen() {
   }
 
   // Adding a common item that's already on the list just bumps its quantity.
+  // We add the localized name so the list reads in the user's language.
   function addCommon(common: CommonItem) {
+    const label = t(`item.${itemSlug(common.name)}`);
     const existing = items.find(
-      (i) => !i.is_checked && i.name.toLowerCase() === common.name.toLowerCase()
+      (i) => !i.is_checked && i.name.toLowerCase() === label.toLowerCase()
     );
     if (existing) setQuantity(existing, existing.quantity + 1);
-    else addItem(common.name, { category: common.category });
+    else addItem(label, { category: common.category });
   }
 
   function handleRetry() {
@@ -106,16 +111,16 @@ export default function ListScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.inner}>
           <View style={styles.header}>
-            <ThemedText type="subtitle">Shopping list</ThemedText>
+            <ThemedText type="subtitle">{t('list.title')}</ThemedText>
             {checkedCount > 0 && (
               <Pressable
                 onPress={clearChecked}
                 accessibilityRole="button"
-                accessibilityLabel="Clear checked items"
+                accessibilityLabel={t('list.clearCheckedA11y')}
                 hitSlop={8}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Clear checked ({checkedCount})
+                  {t('list.clearChecked', { count: checkedCount })}
                 </ThemedText>
               </Pressable>
             )}
@@ -129,7 +134,7 @@ export default function ListScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.banner}>
                 <ThemedText type="small" style={styles.bannerText}>
-                  {error} — tap to retry
+                  {t('error.tapRetry', { error })}
                 </ThemedText>
               </ThemedView>
             </Pressable>
@@ -145,7 +150,7 @@ export default function ListScreen() {
                   borderColor: theme.backgroundSelected,
                 },
               ]}
-              placeholder="Add an item…"
+              placeholder={t('list.addPlaceholder')}
               placeholderTextColor={theme.textSecondary}
               value={draft}
               onChangeText={setDraft}
@@ -157,7 +162,7 @@ export default function ListScreen() {
               onPress={handleAdd}
               disabled={!canAdd}
               accessibilityRole="button"
-              accessibilityLabel="Add item"
+              accessibilityLabel={t('list.addItem')}
               style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
               <ThemedText style={styles.addButtonText}>+</ThemedText>
             </Pressable>
@@ -166,10 +171,10 @@ export default function ListScreen() {
           <Pressable
             onPress={() => setShowCatalog((s) => !s)}
             accessibilityRole="button"
-            accessibilityLabel="Browse common items"
+            accessibilityLabel={t('list.browseCommon')}
             style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
             <ThemedText type="smallBold" style={styles.catalogToggleText}>
-              {showCatalog ? '✕  Hide common items' : '✨  Common items'}
+              {showCatalog ? t('list.hideCommon') : t('list.commonItems')}
             </ThemedText>
           </Pressable>
 
@@ -185,7 +190,7 @@ export default function ListScreen() {
             ) : items.length === 0 ? (
               <View style={styles.center}>
                 <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                  Your list is empty.{'\n'}Type an item above, or tap “Common items”.
+                  {t('list.empty')}
                 </ThemedText>
               </View>
             ) : (
@@ -196,7 +201,7 @@ export default function ListScreen() {
                 stickySectionHeadersEnabled={false}
                 renderSectionHeader={({ section }) => (
                   <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeader}>
-                    {section.category.emoji}  {section.category.label.toUpperCase()}
+                    {section.category.emoji}  {t(`grocery.${section.category.key}`).toUpperCase()}
                   </ThemedText>
                 )}
                 renderItem={({ item }) => (
@@ -224,6 +229,7 @@ function Catalog({
   onAdd: (item: CommonItem) => void;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   // A small static catalog — a ScrollView renders every chip (no virtualization),
   // so nothing is hidden until scrolled into view.
   return (
@@ -234,17 +240,18 @@ function Catalog({
         return (
           <View key={category.key} style={styles.catalogGroup}>
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeader}>
-              {category.emoji}  {category.label.toUpperCase()}
+              {category.emoji}  {t(`grocery.${category.key}`).toUpperCase()}
             </ThemedText>
             <View style={styles.chipWrap}>
               {options.map((common) => {
-                const added = activeNames.has(common.name.toLowerCase());
+                const label = t(`item.${itemSlug(common.name)}`);
+                const added = activeNames.has(label.toLowerCase());
                 return (
                   <Pressable
                     key={common.name}
                     onPress={() => onAdd(common)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Add ${common.name}`}
+                    accessibilityLabel={t('list.addNamed', { name: label })}
                     style={({ pressed }) => [
                       styles.chip,
                       { borderColor: theme.backgroundSelected, backgroundColor: theme.backgroundElement },
@@ -255,7 +262,7 @@ function Catalog({
                       type="small"
                       style={added ? { color: Accent.primary, fontWeight: '700' } : undefined}>
                       {added ? '✓ ' : '+ '}
-                      {common.name}
+                      {label}
                     </ThemedText>
                   </Pressable>
                 );
@@ -280,6 +287,7 @@ function ListRow({
   onRemove: () => void;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <Pressable
@@ -311,7 +319,7 @@ function ListRow({
             onPress={() => onQuantity(item.quantity - 1)}
             disabled={item.quantity <= 1}
             accessibilityRole="button"
-            accessibilityLabel={`Decrease ${item.name}`}
+            accessibilityLabel={t('list.decrease', { name: item.name })}
             hitSlop={6}
             style={({ pressed }) => [styles.stepBtn, { opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 }]}>
             <ThemedText style={styles.stepBtnText}>−</ThemedText>
@@ -320,7 +328,7 @@ function ListRow({
           <Pressable
             onPress={() => onQuantity(item.quantity + 1)}
             accessibilityRole="button"
-            accessibilityLabel={`Increase ${item.name}`}
+            accessibilityLabel={t('list.increase', { name: item.name })}
             hitSlop={6}
             style={({ pressed }) => [styles.stepBtn, pressed && styles.pressed]}>
             <ThemedText style={styles.stepBtnText}>＋</ThemedText>
@@ -331,7 +339,7 @@ function ListRow({
       <Pressable
         onPress={onRemove}
         accessibilityRole="button"
-        accessibilityLabel={`Remove ${item.name}`}
+        accessibilityLabel={t('list.remove', { name: item.name })}
         hitSlop={8}
         style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
         <ThemedText type="small" themeColor="textSecondary">

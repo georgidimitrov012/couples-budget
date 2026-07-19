@@ -16,11 +16,13 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../../lib/supabase';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 const MIN_PASSWORD_LENGTH = 6;
 
 export default function SignUpScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,11 +35,11 @@ export default function SignUpScreen() {
     if (loading) return;
     setError(null);
     if (!email.trim() || !password) {
-      setError('Enter your email and password.');
+      setError(t('error.enterCreds'));
       return;
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setError(t('error.passwordShort', { min: MIN_PASSWORD_LENGTH }));
       return;
     }
 
@@ -76,14 +78,13 @@ export default function SignUpScreen() {
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={[styles.form, styles.centered]}>
-            <ThemedText type="subtitle">Check your email</ThemedText>
+            <ThemedText type="subtitle">{t('signup.checkTitle')}</ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.centerText}>
-              We sent a confirmation link to {email.trim()}. Tap it to finish creating your account,
-              then sign in.
+              {t('signup.checkBody', { email: email.trim() })}
             </ThemedText>
             <Link href="/sign-in" asChild>
               <Pressable style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}>
-                <ThemedText style={styles.buttonText}>Back to sign in</ThemedText>
+                <ThemedText style={styles.buttonText}>{t('signup.backToSignin')}</ThemedText>
               </Pressable>
             </Link>
           </View>
@@ -100,16 +101,14 @@ export default function SignUpScreen() {
           style={styles.flex}>
           <View style={styles.form}>
             <View style={styles.header}>
-              <ThemedText type="subtitle">Create account</ThemedText>
-              <ThemedText themeColor="textSecondary">
-                Start your shared budget and shopping list.
-              </ThemedText>
+              <ThemedText type="subtitle">{t('signup.title')}</ThemedText>
+              <ThemedText themeColor="textSecondary">{t('signup.subtitle')}</ThemedText>
             </View>
 
             <View style={styles.fields}>
               <TextInput
                 style={inputStyle}
-                placeholder="Display name"
+                placeholder={t('field.displayName')}
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="words"
                 autoComplete="name"
@@ -120,7 +119,7 @@ export default function SignUpScreen() {
               />
               <TextInput
                 style={inputStyle}
-                placeholder="Email"
+                placeholder={t('field.email')}
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -133,7 +132,7 @@ export default function SignUpScreen() {
               />
               <TextInput
                 style={inputStyle}
-                placeholder="Password"
+                placeholder={t('field.password')}
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -160,18 +159,18 @@ export default function SignUpScreen() {
               {loading ? (
                 <ActivityIndicator color={Accent.onPrimary} />
               ) : (
-                <ThemedText style={styles.buttonText}>Create account</ThemedText>
+                <ThemedText style={styles.buttonText}>{t('signup.button')}</ThemedText>
               )}
             </Pressable>
 
             <View style={styles.footer}>
               <ThemedText type="small" themeColor="textSecondary">
-                Already have an account?{' '}
+                {t('signup.haveAccount')}
               </ThemedText>
               <Link href="/sign-in" asChild>
                 <Pressable disabled={loading}>
                   <ThemedText type="small" style={styles.link}>
-                    Sign in
+                    {t('signup.signin')}
                   </ThemedText>
                 </Pressable>
               </Link>

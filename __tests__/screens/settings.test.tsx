@@ -43,6 +43,12 @@ describe('SettingsScreen', () => {
     expect(screen.getByLabelText('Delete account')).toBeTruthy();
   });
 
+  it('offers both language options', async () => {
+    await render(<SettingsScreen />);
+    expect(screen.getByLabelText('Български')).toBeTruthy();
+    expect(screen.getByLabelText('English')).toBeTruthy();
+  });
+
   it('leaves the household after confirming', async () => {
     autoConfirm();
     const user = userEvent.setup();

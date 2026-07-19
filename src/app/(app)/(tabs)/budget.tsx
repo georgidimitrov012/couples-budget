@@ -28,6 +28,7 @@ import { useHousehold } from '../../../../hooks/useHousehold';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useSettleUp } from '../../../../hooks/useSettleUp';
 import { useShoppingList } from '../../../../hooks/useShoppingList';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import {
   useTransactions,
   type Transaction,
@@ -41,6 +42,7 @@ function currentMonthKey(): string {
 
 export default function BudgetScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { items, loading, error, addTransaction, removeTransaction, retry } = useTransactions();
   const { categories } = useCategories();
   const { user } = useAuth();
@@ -145,15 +147,15 @@ export default function BudgetScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.inner}>
           <View style={styles.headerRow}>
-            <ThemedText type="subtitle">Budget</ThemedText>
+            <ThemedText type="subtitle">{t('budget.title')}</ThemedText>
             <Link href="/categories" asChild>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Manage categories"
+                accessibilityLabel={t('budget.manageCategories')}
                 hitSlop={8}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedText type="smallBold" style={styles.link}>
-                  Categories
+                  {t('budget.categories')}
                 </ThemedText>
               </Pressable>
             </Link>
@@ -164,13 +166,23 @@ export default function BudgetScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
             <View style={styles.summaryRow}>
-              <SummaryCard label="Ours" sublabel="this month" value={oursTotal} tone="ours" />
-              <SummaryCard label="Mine" sublabel="this month" value={mineTotal} tone="mine" />
+              <SummaryCard
+                label={t('scope.ours')}
+                sublabel={t('budget.thisMonth')}
+                value={oursTotal}
+                tone="ours"
+              />
+              <SummaryCard
+                label={t('scope.mine')}
+                sublabel={t('budget.thisMonth')}
+                value={mineTotal}
+                tone="mine"
+              />
             </View>
 
             {partner && (
               <SettleCard
-                partnerName={partner.display_name ?? 'Your partner'}
+                partnerName={partner.display_name ?? t('settle.yourPartner')}
                 myName={myName}
                 balance={settle.balance}
                 lastSettledOn={settle.lastSettledOn}
@@ -202,7 +214,7 @@ export default function BudgetScreen() {
                   styles.descInput,
                   { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
                 ]}
-                placeholder="What was it for? (optional)"
+                placeholder={t('budget.descPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
                 value={description}
                 onChangeText={setDescription}
@@ -217,7 +229,7 @@ export default function BudgetScreen() {
                   keyboardShouldPersistTaps="handled"
                   contentContainerStyle={styles.chipRow}>
                   <CategoryChip
-                    label="None"
+                    label={t('budget.none')}
                     active={categoryId === null}
                     onPress={() => setCategoryId(null)}
                   />
@@ -250,9 +262,9 @@ export default function BudgetScreen() {
                 onPress={handleAdd}
                 disabled={!canAdd}
                 accessibilityRole="button"
-                accessibilityLabel="Add expense"
+                accessibilityLabel={t('budget.addExpense')}
                 style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
-                <ThemedText style={styles.addButtonText}>Add expense</ThemedText>
+                <ThemedText style={styles.addButtonText}>{t('budget.addExpense')}</ThemedText>
               </Pressable>
             </ThemedView>
 
@@ -260,11 +272,11 @@ export default function BudgetScreen() {
               <Pressable
                 onPress={retry}
                 accessibilityRole="button"
-                accessibilityLabel="Retry"
+                accessibilityLabel={t('common.retry')}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundElement" style={styles.banner}>
                   <ThemedText type="small" style={styles.bannerText}>
-                    {error} — tap to retry
+                    {t('error.tapRetry', { error })}
                   </ThemedText>
                 </ThemedView>
               </Pressable>
@@ -277,7 +289,7 @@ export default function BudgetScreen() {
             ) : items.length === 0 ? (
               <View style={styles.center}>
                 <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                  No expenses yet.{'\n'}Add your first one above.
+                  {t('budget.empty')}
                 </ThemedText>
               </View>
             ) : (
@@ -316,6 +328,7 @@ function SettleCard({
   error: string | null;
   onSettle: () => void;
 }) {
+  const { t } = useTranslation();
   const square = Math.round(balance * 100) === 0;
   const owed = formatAmount(Math.abs(balance));
   return (
@@ -329,14 +342,14 @@ function SettleCard({
       <View style={styles.settleMain}>
         <ThemedText testID="settle-balance">
           {square
-            ? "You're all square"
+            ? t('settle.allSquare')
             : balance > 0
-              ? `${partnerName} owes you ${owed}`
-              : `You owe ${partnerName} ${owed}`}
+              ? t('settle.owesYou', { name: partnerName, amount: owed })
+              : t('settle.youOwe', { name: partnerName, amount: owed })}
         </ThemedText>
         {square && lastSettledOn ? (
           <ThemedText type="small" themeColor="textSecondary">
-            Last settled {lastSettledOn}
+            {t('settle.lastSettled', { date: lastSettledOn })}
           </ThemedText>
         ) : null}
         {error ? (
@@ -350,7 +363,7 @@ function SettleCard({
           onPress={onSettle}
           disabled={settling}
           accessibilityRole="button"
-          accessibilityLabel="Mark as settled"
+          accessibilityLabel={t('settle.markSettled')}
           style={({ pressed }) => [
             styles.settleButton,
             { opacity: pressed || settling ? 0.6 : 1 },
@@ -359,7 +372,7 @@ function SettleCard({
             <ActivityIndicator color={Accent.onScope} />
           ) : (
             <ThemedText type="smallBold" style={styles.settleButtonText}>
-              Settle
+              {t('settle.settle')}
             </ThemedText>
           )}
         </Pressable>
@@ -375,10 +388,11 @@ function CategoryBudgets({
   budgets: Category[];
   spendByCategory: Map<string, number>;
 }) {
+  const { t } = useTranslation();
   return (
     <ThemedView type="backgroundElement" style={styles.budgetsCard} testID="category-budgets">
       <ThemedText type="smallBold" themeColor="textSecondary">
-        CATEGORY BUDGETS · THIS MONTH
+        {t('budget.categoryBudgets')}
       </ThemedText>
       {budgets.map((c) => {
         const spent = spendByCategory.get(c.id) ?? 0;
@@ -499,6 +513,7 @@ function ListLink({
   descLabel: string;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   if (activeItems.length === 0 && !showAddToList) return null;
 
   return (
@@ -506,7 +521,7 @@ function ListLink({
       {activeItems.length > 0 && (
         <>
           <ThemedText type="smallBold" themeColor="textSecondary">
-            🛒  FOR A LIST ITEM
+            {t('budget.forListItem')}
           </ThemedText>
           <ScrollView
             horizontal
@@ -514,8 +529,8 @@ function ListLink({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.chipRow}>
             <CategoryChip
-              label="None"
-              accessibilityLabel="No list item"
+              label={t('budget.none')}
+              accessibilityLabel={t('budget.noListItem')}
               active={linkedItem === null}
               onPress={() => onSelect(null)}
             />
@@ -523,7 +538,7 @@ function ListLink({
               <CategoryChip
                 key={it.id}
                 label={it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name}
-                accessibilityLabel={`List item: ${it.name}`}
+                accessibilityLabel={t('budget.listItem', { name: it.name })}
                 active={linkedItem?.id === it.id}
                 onPress={() => onSelect(it)}
               />
@@ -535,14 +550,14 @@ function ListLink({
       {linkedItem && (
         <View style={styles.boughtRow}>
           <ThemedText type="small" themeColor="textSecondary">
-            Bought
+            {t('budget.bought')}
           </ThemedText>
           <View style={styles.stepper}>
             <Pressable
               onPress={() => onBoughtQty(Math.max(1, boughtQty - 1))}
               disabled={boughtQty <= 1}
               accessibilityRole="button"
-              accessibilityLabel="Decrease quantity bought"
+              accessibilityLabel={t('budget.decreaseBought')}
               hitSlop={6}
               style={({ pressed }) => [
                 styles.stepBtn,
@@ -557,7 +572,7 @@ function ListLink({
               onPress={() => onBoughtQty(Math.min(linkedItem.quantity, boughtQty + 1))}
               disabled={boughtQty >= linkedItem.quantity}
               accessibilityRole="button"
-              accessibilityLabel="Increase quantity bought"
+              accessibilityLabel={t('budget.increaseBought')}
               hitSlop={6}
               style={({ pressed }) => [
                 styles.stepBtn,
@@ -567,7 +582,7 @@ function ListLink({
             </Pressable>
           </View>
           <ThemedText type="small" themeColor="textSecondary">
-            of {linkedItem.quantity}
+            {t('budget.of', { qty: linkedItem.quantity })}
           </ThemedText>
         </View>
       )}
@@ -577,7 +592,7 @@ function ListLink({
           onPress={onToggleAddToList}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: addToList }}
-          accessibilityLabel="Also add to shopping list"
+          accessibilityLabel={t('budget.addToListA11y')}
           style={({ pressed }) => [styles.addToListRow, pressed && styles.pressed]}>
           <View
             style={[
@@ -588,7 +603,7 @@ function ListLink({
             {addToList && <ThemedText style={styles.checkmarkSm}>✓</ThemedText>}
           </View>
           <ThemedText type="small" numberOfLines={1} style={styles.flexShrink}>
-            Add “{descLabel}” to shopping list
+            {t('budget.addToList', { name: descLabel })}
           </ThemedText>
         </Pressable>
       )}
@@ -605,11 +620,13 @@ function TransactionRow({
   category?: Category;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
+  const desc = item.description || t('budget.expense');
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <View style={styles.rowMain}>
         <ThemedText numberOfLines={1} style={styles.rowDesc}>
-          {item.description || 'Expense'}
+          {desc}
         </ThemedText>
         <View style={styles.rowMeta}>
           <ThemedText type="small" themeColor="textSecondary">
@@ -621,7 +638,7 @@ function TransactionRow({
               { backgroundColor: item.scope === 'shared' ? Accent.ours : Accent.mine },
             ]}>
             <ThemedText type="small" style={styles.scopeChipText}>
-              {item.scope === 'shared' ? 'Ours' : 'Mine'}
+              {item.scope === 'shared' ? t('scope.ours') : t('scope.mine')}
             </ThemedText>
           </View>
           {category ? (
@@ -642,7 +659,7 @@ function TransactionRow({
       <Pressable
         onPress={onRemove}
         accessibilityRole="button"
-        accessibilityLabel={`Remove ${item.description || 'expense'}`}
+        accessibilityLabel={t('budget.removeExpense', { name: desc })}
         hitSlop={8}
         style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
         <ThemedText type="small" themeColor="textSecondary">

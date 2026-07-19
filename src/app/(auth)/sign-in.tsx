@@ -16,9 +16,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../../lib/supabase';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export default function SignInScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export default function SignInScreen() {
     if (loading) return;
     setError(null);
     if (!email.trim() || !password) {
-      setError('Enter your email and password.');
+      setError(t('error.enterCreds'));
       return;
     }
 
@@ -61,14 +63,14 @@ export default function SignInScreen() {
           style={styles.flex}>
           <View style={styles.form}>
             <View style={styles.header}>
-              <ThemedText type="subtitle">Welcome back</ThemedText>
-              <ThemedText themeColor="textSecondary">Sign in to your shared budget.</ThemedText>
+              <ThemedText type="subtitle">{t('signin.title')}</ThemedText>
+              <ThemedText themeColor="textSecondary">{t('signin.subtitle')}</ThemedText>
             </View>
 
             <View style={styles.fields}>
               <TextInput
                 style={inputStyle}
-                placeholder="Email"
+                placeholder={t('field.email')}
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -81,7 +83,7 @@ export default function SignInScreen() {
               />
               <TextInput
                 style={inputStyle}
-                placeholder="Password"
+                placeholder={t('field.password')}
                 placeholderTextColor={theme.textSecondary}
                 autoCapitalize="none"
                 autoComplete="current-password"
@@ -111,18 +113,18 @@ export default function SignInScreen() {
               {loading ? (
                 <ActivityIndicator color={Accent.onPrimary} />
               ) : (
-                <ThemedText style={styles.buttonText}>Sign in</ThemedText>
+                <ThemedText style={styles.buttonText}>{t('signin.button')}</ThemedText>
               )}
             </Pressable>
 
             <View style={styles.footer}>
               <ThemedText type="small" themeColor="textSecondary">
-                No account yet?{' '}
+                {t('signin.noAccount')}
               </ThemedText>
               <Link href="/sign-up" asChild>
                 <Pressable disabled={loading}>
                   <ThemedText type="small" style={styles.link}>
-                    Create one
+                    {t('signin.createOne')}
                   </ThemedText>
                 </Pressable>
               </Link>

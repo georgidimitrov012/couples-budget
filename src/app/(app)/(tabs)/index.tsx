@@ -9,11 +9,13 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useHousehold } from '../../../../hooks/useHousehold';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { supabase } from '../../../../lib/supabase';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { household, members, regenerateInviteCode } = useHousehold();
   const [signingOut, setSigningOut] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -43,10 +45,10 @@ export default function HomeScreen() {
           <Pressable
             onPress={() => router.push('/settings')}
             accessibilityRole="button"
-            accessibilityLabel="Settings"
+            accessibilityLabel={t('home.settings')}
             hitSlop={8}
             style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedText style={styles.settingsLink}>Settings</ThemedText>
+            <ThemedText style={styles.settingsLink}>{t('home.settings')}</ThemedText>
           </Pressable>
         </View>
 
@@ -54,7 +56,7 @@ export default function HomeScreen() {
           <View style={styles.greeting}>
             <Avatar name={displayName} color={Accent.ours} size={64} />
             <ThemedText type="subtitle" style={styles.centerText}>
-              Hi, {displayName}
+              {t('home.greeting', { name: displayName })}
             </ThemedText>
             {household && (
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
@@ -66,7 +68,7 @@ export default function HomeScreen() {
           {waitingForPartner ? (
             <ThemedView type="backgroundElement" style={[styles.inviteCard, Shadow.card]}>
               <ThemedText type="smallBold" themeColor="textSecondary">
-                SHARE THIS CODE WITH YOUR PARTNER
+                {t('home.shareCode')}
               </ThemedText>
               <ThemedText style={[styles.code, { color: Accent.primary }]} selectable>
                 {household?.invite_code ?? '——————'}
@@ -74,28 +76,28 @@ export default function HomeScreen() {
               <View style={styles.waitingRow}>
                 <ActivityIndicator size="small" color={Accent.mine} />
                 <ThemedText type="small" themeColor="textSecondary">
-                  Waiting for your partner to join…
+                  {t('home.waiting')}
                 </ThemedText>
               </View>
               <Pressable
                 onPress={handleRegenerate}
                 disabled={regenerating}
                 accessibilityRole="button"
-                accessibilityLabel="Regenerate code"
+                accessibilityLabel={t('home.regenerate')}
                 hitSlop={8}
                 style={({ pressed }) => (pressed || regenerating) && styles.pressed}>
                 {regenerating ? (
                   <ActivityIndicator size="small" color={Accent.primary} />
                 ) : (
                   <ThemedText type="small" style={styles.regenerateText}>
-                    Regenerate code
+                    {t('home.regenerate')}
                   </ThemedText>
                 )}
               </Pressable>
             </ThemedView>
           ) : (
             <ThemedText themeColor="textSecondary" style={styles.centerText}>
-              You&apos;re both set up. Next up: your shared shopping list and budget.
+              {t('home.bothSetUp')}
             </ThemedText>
           )}
         </View>
@@ -108,7 +110,7 @@ export default function HomeScreen() {
           {signingOut ? (
             <ActivityIndicator />
           ) : (
-            <ThemedText style={styles.signOutText}>Sign out</ThemedText>
+            <ThemedText style={styles.signOutText}>{t('common.signOut')}</ThemedText>
           )}
         </Pressable>
       </SafeAreaView>
