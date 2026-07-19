@@ -6,12 +6,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { LANG_LABEL, LANGS } from '../../../lib/i18n';
 import { useAccount } from '../../../hooks/useAccount';
 import { useAuth } from '../../../hooks/useAuth';
 import { useHousehold } from '../../../hooks/useHousehold';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const theme = useTheme();
+  const { t, lang, setLang } = useTranslation();
   const { user } = useAuth();
   const { household, members, leaveHousehold } = useHousehold();
   const { deleteAccount } = useAccount();
@@ -26,7 +31,7 @@ export default function SettingsScreen() {
     const { error } = await leaveHousehold();
     if (error) {
       setBusy(null);
-      Alert.alert('Could not leave', error);
+      Alert.alert(t('settings.leaveFailed'), error);
     }
     // On success the (app) guard swaps to the create/join onboarding screen and
     // this modal unmounts, so there's nothing more to do here.
@@ -37,33 +42,27 @@ export default function SettingsScreen() {
     const { error } = await deleteAccount();
     if (error) {
       setBusy(null);
-      Alert.alert('Could not delete account', error);
+      Alert.alert(t('settings.deleteFailed'), error);
     }
     // On success the session is cleared and the app routes back to sign-in.
   }
 
   function confirmLeave() {
     Alert.alert(
-      'Leave household?',
-      soloHousehold
-        ? 'This deletes the household and everything in it. This cannot be undone.'
-        : "Your budget entries, settlements and receipts in this household will be deleted, and it stays with your partner. This can't be undone.",
+      t('settings.leaveTitle'),
+      soloHousehold ? t('settings.leaveSolo') : t('settings.leaveCouple'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Leave', style: 'destructive', onPress: doLeave },
+        { text: t('settings.leaveCancel'), style: 'cancel' },
+        { text: t('settings.leaveConfirm'), style: 'destructive', onPress: doLeave },
       ]
     );
   }
 
   function confirmDelete() {
-    Alert.alert(
-      'Delete account?',
-      'This permanently deletes your account and your data. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete account', style: 'destructive', onPress: doDelete },
-      ]
-    );
+    Alert.alert(t('settings.deleteTitle'), t('settings.deleteBody'), [
+      { text: t('settings.leaveCancel'), style: 'cancel' },
+      { text: t('settings.deleteConfirm'), style: 'destructive', onPress: doDelete },
+    ]);
   }
 
   return (
@@ -71,20 +70,20 @@ export default function SettingsScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
           <View style={styles.header}>
-            <ThemedText type="subtitle">Settings</ThemedText>
+            <ThemedText type="subtitle">{t('settings.title')}</ThemedText>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               hitSlop={8}
               style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText style={styles.close}>Done</ThemedText>
+              <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
           </View>
 
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              ACCOUNT
+              {t('settings.account')}
             </ThemedText>
             <ThemedText style={styles.name} numberOfLines={1}>
               {displayName}
@@ -102,19 +101,49 @@ export default function SettingsScreen() {
           </ThemedView>
 
           <ThemedView type="backgroundElement" style={styles.card}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              {t('settings.language')}
+            </ThemedText>
+            <View style={styles.langRow}>
+              {LANGS.map((l) => {
+                const active = lang === l;
+                return (
+                  <Pressable
+                    key={l}
+                    onPress={() => setLang(l)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={LANG_LABEL[l]}
+                    style={[
+                      styles.langOption,
+                      { borderColor: active ? Accent.primary : theme.backgroundSelected },
+                      active && { backgroundColor: theme.tint },
+                    ]}>
+                    <ThemedText
+                      style={active ? styles.langActive : undefined}
+                      themeColor={active ? 'text' : 'textSecondary'}>
+                      {LANG_LABEL[l]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={styles.card}>
             <Pressable
               onPress={confirmLeave}
               disabled={busy != null}
               accessibilityRole="button"
-              accessibilityLabel="Leave household"
+              accessibilityLabel={t('settings.leave')}
               style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
               {busy === 'leave' ? (
                 <ActivityIndicator />
               ) : (
-                <ThemedText style={styles.actionText}>Leave household</ThemedText>
+                <ThemedText style={styles.actionText}>{t('settings.leave')}</ThemedText>
               )}
               <ThemedText type="small" themeColor="textSecondary">
-                Exit this household and return to setup.
+                {t('settings.leaveDesc')}
               </ThemedText>
             </Pressable>
           </ThemedView>
@@ -124,15 +153,17 @@ export default function SettingsScreen() {
               onPress={confirmDelete}
               disabled={busy != null}
               accessibilityRole="button"
-              accessibilityLabel="Delete account"
+              accessibilityLabel={t('settings.delete')}
               style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
               {busy === 'delete' ? (
                 <ActivityIndicator color={Accent.danger} />
               ) : (
-                <ThemedText style={[styles.actionText, styles.danger]}>Delete account</ThemedText>
+                <ThemedText style={[styles.actionText, styles.danger]}>
+                  {t('settings.delete')}
+                </ThemedText>
               )}
               <ThemedText type="small" themeColor="textSecondary">
-                Permanently delete your account and your data.
+                {t('settings.deleteDesc')}
               </ThemedText>
             </Pressable>
           </ThemedView>
@@ -172,4 +203,13 @@ const styles = StyleSheet.create({
   action: { gap: Spacing.one },
   actionText: { fontSize: 16, fontWeight: '600', color: Accent.primary },
   danger: { color: Accent.danger },
+  langRow: { flexDirection: 'row', gap: Spacing.two },
+  langOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  langActive: { fontWeight: '700' },
 });

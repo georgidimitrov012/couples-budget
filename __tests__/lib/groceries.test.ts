@@ -16,6 +16,12 @@ describe('categorize', () => {
     expect(categorize('spaceship')).toBe('other');
     expect(categorize('')).toBe('other');
   });
+
+  it('matches Bulgarian catalog names too', () => {
+    expect(categorize('Мляко')).toBe('dairy');
+    expect(categorize('хляб')).toBe('bakery');
+    expect(categorize('прясно мляко')).toBe('dairy');
+  });
 });
 
 describe('categoryFor', () => {

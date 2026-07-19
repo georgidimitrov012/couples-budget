@@ -6,9 +6,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { CategoriesProvider } from '../../../hooks/useCategories';
 import { HouseholdProvider, useHousehold } from '../../../hooks/useHousehold';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 function AppNavigator() {
   const { household, loading, error, refresh } = useHousehold();
+  const { t } = useTranslation();
 
   // The splash is already gone by now, so show an explicit loading/error state
   // while the household membership resolves.
@@ -27,7 +29,7 @@ function AppNavigator() {
           {error}
         </ThemedText>
         <Pressable onPress={refresh} style={({ pressed }) => [styles.retry, { opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText style={styles.retryText}>Try again</ThemedText>
+          <ThemedText style={styles.retryText}>{t('common.tryAgain')}</ThemedText>
         </Pressable>
       </ThemedView>
     );

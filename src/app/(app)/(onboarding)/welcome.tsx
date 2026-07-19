@@ -6,37 +6,38 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { supabase } from '../../../../lib/supabase';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 export default function WelcomeScreen() {
+  const { t } = useTranslation();
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <ThemedText type="subtitle" style={styles.centerText}>
-            Set up your household
+            {t('welcome.title')}
           </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.centerText}>
-            A household links you and your partner. Create one and share the code, or join with a
-            code you already have.
+            {t('welcome.subtitle')}
           </ThemedText>
         </View>
 
         <View style={styles.actions}>
           <Link href="/create" asChild>
             <Pressable style={({ pressed }) => [styles.primary, { opacity: pressed ? 0.8 : 1 }]}>
-              <ThemedText style={styles.primaryText}>Create a household</ThemedText>
+              <ThemedText style={styles.primaryText}>{t('welcome.create')}</ThemedText>
             </Pressable>
           </Link>
           <Link href="/join" asChild>
             <Pressable style={({ pressed }) => [styles.secondary, { opacity: pressed ? 0.6 : 1 }]}>
-              <ThemedText style={styles.secondaryText}>Join with a code</ThemedText>
+              <ThemedText style={styles.secondaryText}>{t('welcome.join')}</ThemedText>
             </Pressable>
           </Link>
           <Pressable
             onPress={() => supabase.auth.signOut()}
             style={({ pressed }) => [styles.signOut, { opacity: pressed ? 0.6 : 1 }]}>
             <ThemedText type="small" themeColor="textSecondary">
-              Sign out
+              {t('common.signOut')}
             </ThemedText>
           </Pressable>
         </View>

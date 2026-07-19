@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { parseAmount } from '../../../lib/format';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCategories, type Category, type CategoryScope } from '../../../hooks/useCategories';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 const CATEGORY_COLORS = [
   '#e5484d',
@@ -39,6 +40,7 @@ const CATEGORY_ICONS = [
 
 function IconPicker({ selected, onSelect }: { selected: string | null; onSelect: (icon: string) => void }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={styles.iconRow}>
       {CATEGORY_ICONS.map((emoji) => (
@@ -46,7 +48,7 @@ function IconPicker({ selected, onSelect }: { selected: string | null; onSelect:
           key={emoji}
           onPress={() => onSelect(emoji)}
           accessibilityRole="button"
-          accessibilityLabel={`Icon ${emoji}`}
+          accessibilityLabel={t('cat.icon', { icon: emoji })}
           accessibilityState={{ selected: selected === emoji }}
           style={[
             styles.iconOption,
@@ -63,6 +65,7 @@ function IconPicker({ selected, onSelect }: { selected: string | null; onSelect:
 export default function CategoriesScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { categories, loading, error, addCategory, updateCategory, removeCategory } = useCategories();
 
@@ -109,14 +112,14 @@ export default function CategoriesScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
           <View style={styles.header}>
-            <ThemedText type="subtitle">Categories</ThemedText>
+            <ThemedText type="subtitle">{t('cat.title')}</ThemedText>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               hitSlop={8}
               style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText style={styles.close}>Done</ThemedText>
+              <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
           </View>
 
@@ -126,7 +129,7 @@ export default function CategoriesScreen() {
                 styles.input,
                 { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
               ]}
-              placeholder="Category name"
+              placeholder={t('cat.namePlaceholder')}
               placeholderTextColor={theme.textSecondary}
               value={name}
               onChangeText={setName}
@@ -142,7 +145,7 @@ export default function CategoriesScreen() {
                   key={c}
                   onPress={() => setColor(c)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Color ${c}`}
+                  accessibilityLabel={t('cat.color', { color: c })}
                   accessibilityState={{ selected: color === c }}
                   style={[
                     styles.swatch,
@@ -158,14 +161,14 @@ export default function CategoriesScreen() {
                 styles.input,
                 { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
               ]}
-              placeholder="Monthly limit (optional)"
+              placeholder={t('cat.limitPlaceholder')}
               placeholderTextColor={theme.textSecondary}
               value={limit}
               onChangeText={setLimit}
               keyboardType="decimal-pad"
               returnKeyType="done"
               onSubmitEditing={handleAdd}
-              accessibilityLabel="Monthly limit"
+              accessibilityLabel={t('cat.limitA11y')}
             />
 
             <View style={styles.formRow}>
@@ -174,7 +177,7 @@ export default function CategoriesScreen() {
                 onPress={handleAdd}
                 disabled={!name.trim() || saving}
                 accessibilityRole="button"
-                accessibilityLabel="Add category"
+                accessibilityLabel={t('cat.addCategory')}
                 style={({ pressed }) => [
                   styles.addButton,
                   { opacity: pressed || !name.trim() || saving ? 0.6 : 1 },
@@ -182,7 +185,7 @@ export default function CategoriesScreen() {
                 {saving ? (
                   <ActivityIndicator color={Accent.onPrimary} />
                 ) : (
-                  <ThemedText style={styles.addButtonText}>Add</ThemedText>
+                  <ThemedText style={styles.addButtonText}>{t('cat.add')}</ThemedText>
                 )}
               </Pressable>
             </View>
@@ -207,7 +210,7 @@ export default function CategoriesScreen() {
           ) : categories.length === 0 ? (
             <View style={styles.center}>
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                No categories yet.{'\n'}Add one above to tag your expenses.
+                {t('cat.empty')}
               </ThemedText>
             </View>
           ) : (
@@ -245,6 +248,7 @@ function CategoryRow({
   onSetIcon: (icon: string) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const [editingIcon, setEditingIcon] = useState(false);
   return (
     <ThemedView type="backgroundElement" style={styles.rowCard}>
@@ -253,7 +257,7 @@ function CategoryRow({
           onPress={() => canEdit && setEditingIcon((v) => !v)}
           disabled={!canEdit}
           accessibilityRole="button"
-          accessibilityLabel={canEdit ? `Change icon for ${category.name}` : undefined}
+          accessibilityLabel={canEdit ? t('cat.changeIcon', { name: category.name }) : undefined}
           hitSlop={6}
           style={styles.iconBadge}>
           {category.icon ? (
@@ -267,7 +271,7 @@ function CategoryRow({
             {category.name}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {category.scope === 'shared' ? 'Ours' : 'Mine'}
+            {category.scope === 'shared' ? t('scope.ours') : t('scope.mine')}
           </ThemedText>
         </View>
         {canEdit ? (
@@ -278,14 +282,14 @@ function CategoryRow({
           />
         ) : category.monthly_limit != null ? (
           <ThemedText type="small" themeColor="textSecondary">
-            Limit {category.monthly_limit}
+            {t('budget.limit', { amount: category.monthly_limit })}
           </ThemedText>
         ) : null}
         {canEdit && (
           <Pressable
             onPress={onRemove}
             accessibilityRole="button"
-            accessibilityLabel={`Remove ${category.name}`}
+            accessibilityLabel={t('cat.removeCategory', { name: category.name })}
             hitSlop={8}
             style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
             <ThemedText type="small" themeColor="textSecondary">
@@ -318,6 +322,7 @@ function LimitInput({
   onCommit: (next: number | null) => void;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [text, setText] = useState(value != null ? String(value) : '');
   useEffect(() => {
     setText(value != null ? String(value) : '');
@@ -331,9 +336,9 @@ function LimitInput({
       onEndEditing={() => onCommit(text.trim() === '' ? null : parseAmount(text))}
       keyboardType="decimal-pad"
       returnKeyType="done"
-      placeholder="Limit"
+      placeholder={t('cat.limitShort')}
       placeholderTextColor={theme.textSecondary}
-      accessibilityLabel={`Monthly limit for ${categoryName}`}
+      accessibilityLabel={t('cat.limitFor', { name: categoryName })}
     />
   );
 }
