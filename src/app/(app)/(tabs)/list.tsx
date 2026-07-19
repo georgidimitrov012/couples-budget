@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -188,11 +189,7 @@ export default function ListScreen() {
                 <ActivityIndicator testID="list-loading" />
               </View>
             ) : items.length === 0 ? (
-              <View style={styles.center}>
-                <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                  {t('list.empty')}
-                </ThemedText>
-              </View>
+              <EmptyState emoji="🛒" title={t('list.emptyTitle')} hint={t('list.emptyHint')} />
             ) : (
               <SectionList
                 sections={sections}

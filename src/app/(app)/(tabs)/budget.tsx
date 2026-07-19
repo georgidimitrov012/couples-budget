@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { EmptyState } from '@/components/empty-state';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
@@ -287,11 +288,11 @@ export default function BudgetScreen() {
                 <ActivityIndicator testID="budget-loading" />
               </View>
             ) : items.length === 0 ? (
-              <View style={styles.center}>
-                <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                  {t('budget.empty')}
-                </ThemedText>
-              </View>
+              <EmptyState
+                emoji="🧾"
+                title={t('budget.emptyTitle')}
+                hint={t('budget.emptyHint')}
+              />
             ) : (
               <View style={styles.listContent}>
                 {items.map((item) => (
