@@ -321,7 +321,10 @@ function ListRow({
             accessibilityRole="button"
             accessibilityLabel={t('list.decrease', { name: item.name })}
             hitSlop={6}
-            style={({ pressed }) => [styles.stepBtn, { opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 }]}>
+            style={({ pressed }) => [
+              styles.stepBtn,
+              { backgroundColor: theme.tint, opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 },
+            ]}>
             <ThemedText style={styles.stepBtnText}>−</ThemedText>
           </Pressable>
           <ThemedText style={styles.stepValue}>{item.quantity}</ThemedText>
@@ -330,7 +333,7 @@ function ListRow({
             accessibilityRole="button"
             accessibilityLabel={t('list.increase', { name: item.name })}
             hitSlop={6}
-            style={({ pressed }) => [styles.stepBtn, pressed && styles.pressed]}>
+            style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
             <ThemedText style={styles.stepBtnText}>＋</ThemedText>
           </Pressable>
         </View>

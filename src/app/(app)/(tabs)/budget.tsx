@@ -340,7 +340,7 @@ function SettleCard({
         </View>
       </View>
       <View style={styles.settleMain}>
-        <ThemedText testID="settle-balance">
+        <ThemedText testID="settle-balance" style={styles.settleText}>
           {square
             ? t('settle.allSquare')
             : balance > 0
@@ -474,7 +474,7 @@ function CategoryChip({
       style={[
         styles.chip,
         { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
-        active && { borderColor: Accent.primary },
+        active && { borderColor: Accent.primary, backgroundColor: theme.tint },
       ]}>
       {icon ? (
         <ThemedText style={styles.chipIcon}>{icon}</ThemedText>
@@ -561,7 +561,7 @@ function ListLink({
               hitSlop={6}
               style={({ pressed }) => [
                 styles.stepBtn,
-                { opacity: boughtQty <= 1 ? 0.35 : pressed ? 0.6 : 1 },
+                { backgroundColor: theme.tint, opacity: boughtQty <= 1 ? 0.35 : pressed ? 0.6 : 1 },
               ]}>
               <ThemedText style={styles.stepBtnText}>−</ThemedText>
             </Pressable>
@@ -576,7 +576,7 @@ function ListLink({
               hitSlop={6}
               style={({ pressed }) => [
                 styles.stepBtn,
-                { opacity: boughtQty >= linkedItem.quantity ? 0.35 : pressed ? 0.6 : 1 },
+                { backgroundColor: theme.tint, opacity: boughtQty >= linkedItem.quantity ? 0.35 : pressed ? 0.6 : 1 },
               ]}>
               <ThemedText style={styles.stepBtnText}>＋</ThemedText>
             </Pressable>
@@ -702,6 +702,7 @@ const styles = StyleSheet.create({
   settleAvatars: { flexDirection: 'row' },
   avatarOverlap: { marginLeft: -12 },
   settleMain: { flex: 1, gap: Spacing.half },
+  settleText: { fontVariant: ['tabular-nums'] },
   settleButton: {
     backgroundColor: Accent.primary,
     borderRadius: Radius.md,
@@ -720,7 +721,7 @@ const styles = StyleSheet.create({
   },
   budgetRow: { gap: Spacing.one },
   budgetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  budgetAmount: { marginLeft: 'auto' },
+  budgetAmount: { marginLeft: 'auto', fontVariant: ['tabular-nums'] },
   overText: { color: Accent.danger },
   summaryCard: {
     flex: 1,
@@ -728,8 +729,14 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.half,
   },
-  summaryLabel: { color: 'rgba(255,255,255,0.85)' },
-  summaryValue: { color: '#ffffff' },
+  summaryLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  summaryValue: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
+  },
   summarySub: { color: 'rgba(255,255,255,0.8)' },
   addCard: {
     borderRadius: Radius.lg,
@@ -746,7 +753,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    fontVariant: ['tabular-nums'],
   },
   descInput: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -825,7 +834,7 @@ const styles = StyleSheet.create({
   scopeChip: { paddingHorizontal: Spacing.two, paddingVertical: 1, borderRadius: Radius.pill },
   scopeChipText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   rowCategory: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-  rowAmount: { fontSize: 18, fontWeight: '700' },
+  rowAmount: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
   remove: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
   pressed: { opacity: 0.6 },
 });
