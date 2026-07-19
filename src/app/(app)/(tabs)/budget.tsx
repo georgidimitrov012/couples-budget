@@ -21,10 +21,13 @@ import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from
 import { useTheme } from '@/hooks/use-theme';
 import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { formatAmount, parseAmount } from '../../../../lib/format';
+import { categorize } from '../../../../lib/groceries';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
 import { useHousehold } from '../../../../hooks/useHousehold';
+import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useSettleUp } from '../../../../hooks/useSettleUp';
+import { useShoppingList } from '../../../../hooks/useShoppingList';
 import {
   useTransactions,
   type Transaction,
@@ -42,6 +45,8 @@ export default function BudgetScreen() {
   const { categories } = useCategories();
   const { user } = useAuth();
   const { members } = useHousehold();
+  const { listId } = useShoppingList();
+  const { items: listItems, addItem: addListItem, completeItem } = useListItems(listId);
   const settle = useSettleUp(items);
   const partner = members.find((m) => m.user_id !== user?.id) ?? null;
   const myName =
@@ -51,6 +56,11 @@ export default function BudgetScreen() {
   const [description, setDescription] = useState('');
   const [scope, setScope] = useState<TransactionScope>('shared');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  // Optional wiring to the shopping list (see the "List↔Budget model" in AGENTS): an
+  // expense can complete a listed item (quantity-aware) or log an off-list buy onto it.
+  const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
+  const [boughtQty, setBoughtQty] = useState(1);
+  const [addToList, setAddToList] = useState(false);
 
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -58,6 +68,28 @@ export default function BudgetScreen() {
   );
   const parsedAmount = parseAmount(amount);
   const canAdd = parsedAmount != null;
+
+  const activeItems = useMemo(() => listItems.filter((i) => !i.is_checked), [listItems]);
+  const linkedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
+  const trimmedDesc = description.trim();
+  const activeNames = useMemo(
+    () => new Set(activeItems.map((i) => i.name.toLowerCase())),
+    [activeItems]
+  );
+  // Offer "also add to the list" only for a fresh off-list name (not one already listed).
+  const showAddToList =
+    !linkedItemId && trimmedDesc.length > 0 && !activeNames.has(trimmedDesc.toLowerCase());
+
+  function selectListItem(item: ListItem | null) {
+    if (!item) {
+      setLinkedItemId(null);
+      return;
+    }
+    setLinkedItemId(item.id);
+    setBoughtQty(item.quantity);
+    setAddToList(false);
+    if (!description.trim()) setDescription(item.name);
+  }
 
   const monthKey = currentMonthKey();
   const thisMonth = items.filter((t) => t.occurred_on.startsWith(monthKey));
@@ -78,15 +110,32 @@ export default function BudgetScreen() {
   async function handleAdd() {
     if (parsedAmount == null) return;
     const selectedCategoryId = categoryId;
+    const linked = linkedItem;
+    const finalDesc = trimmedDesc || linked?.name || '';
+    const bought = boughtQty;
+    const alsoAdd = showAddToList && addToList;
+
     setAmount('');
     setDescription('');
     setCategoryId(null);
+    setLinkedItemId(null);
+    setBoughtQty(1);
+    setAddToList(false);
+
     await addTransaction({
       amount: parsedAmount,
-      description,
+      description: finalDesc,
       scope,
       categoryId: selectedCategoryId ?? undefined,
     });
+
+    // Reflect the spend on the shopping list: complete a listed item (quantity-aware),
+    // or drop an off-list purchase onto the list as already-bought.
+    if (linked) {
+      await completeItem(linked, bought);
+    } else if (alsoAdd && finalDesc) {
+      await addListItem(finalDesc, { checked: true, category: categorize(finalDesc) });
+    }
   }
 
   return (
@@ -184,6 +233,18 @@ export default function BudgetScreen() {
                   ))}
                 </ScrollView>
               )}
+
+              <ListLink
+                activeItems={activeItems}
+                linkedItem={linkedItem}
+                onSelect={selectListItem}
+                boughtQty={boughtQty}
+                onBoughtQty={setBoughtQty}
+                showAddToList={showAddToList}
+                addToList={addToList}
+                onToggleAddToList={() => setAddToList((v) => !v)}
+                descLabel={trimmedDesc}
+              />
 
               <Pressable
                 onPress={handleAdd}
@@ -380,19 +441,21 @@ function CategoryChip({
   icon,
   active,
   onPress,
+  accessibilityLabel,
 }: {
   label: string;
   color?: string | null;
   icon?: string | null;
   active: boolean;
   onPress: () => void;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Category: ${label}`}
+      accessibilityLabel={accessibilityLabel ?? `Category: ${label}`}
       accessibilityState={{ selected: active }}
       style={[
         styles.chip,
@@ -408,6 +471,128 @@ function CategoryChip({
         {label}
       </ThemedText>
     </Pressable>
+  );
+}
+
+// The optional bridge to the shopping list inside the add-expense card: pick a
+// listed item to complete (with a "bought N of Y" stepper), or tick a fresh
+// off-list name to drop it onto the list as already-bought.
+function ListLink({
+  activeItems,
+  linkedItem,
+  onSelect,
+  boughtQty,
+  onBoughtQty,
+  showAddToList,
+  addToList,
+  onToggleAddToList,
+  descLabel,
+}: {
+  activeItems: ListItem[];
+  linkedItem: ListItem | null;
+  onSelect: (item: ListItem | null) => void;
+  boughtQty: number;
+  onBoughtQty: (n: number) => void;
+  showAddToList: boolean;
+  addToList: boolean;
+  onToggleAddToList: () => void;
+  descLabel: string;
+}) {
+  const theme = useTheme();
+  if (activeItems.length === 0 && !showAddToList) return null;
+
+  return (
+    <View style={styles.linkSection}>
+      {activeItems.length > 0 && (
+        <>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            🛒  FOR A LIST ITEM
+          </ThemedText>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.chipRow}>
+            <CategoryChip
+              label="None"
+              accessibilityLabel="No list item"
+              active={linkedItem === null}
+              onPress={() => onSelect(null)}
+            />
+            {activeItems.map((it) => (
+              <CategoryChip
+                key={it.id}
+                label={it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name}
+                accessibilityLabel={`List item: ${it.name}`}
+                active={linkedItem?.id === it.id}
+                onPress={() => onSelect(it)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      )}
+
+      {linkedItem && (
+        <View style={styles.boughtRow}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Bought
+          </ThemedText>
+          <View style={styles.stepper}>
+            <Pressable
+              onPress={() => onBoughtQty(Math.max(1, boughtQty - 1))}
+              disabled={boughtQty <= 1}
+              accessibilityRole="button"
+              accessibilityLabel="Decrease quantity bought"
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.stepBtn,
+                { opacity: boughtQty <= 1 ? 0.35 : pressed ? 0.6 : 1 },
+              ]}>
+              <ThemedText style={styles.stepBtnText}>−</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.stepValue} testID="bought-qty">
+              {boughtQty}
+            </ThemedText>
+            <Pressable
+              onPress={() => onBoughtQty(Math.min(linkedItem.quantity, boughtQty + 1))}
+              disabled={boughtQty >= linkedItem.quantity}
+              accessibilityRole="button"
+              accessibilityLabel="Increase quantity bought"
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.stepBtn,
+                { opacity: boughtQty >= linkedItem.quantity ? 0.35 : pressed ? 0.6 : 1 },
+              ]}>
+              <ThemedText style={styles.stepBtnText}>＋</ThemedText>
+            </Pressable>
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            of {linkedItem.quantity}
+          </ThemedText>
+        </View>
+      )}
+
+      {showAddToList && (
+        <Pressable
+          onPress={onToggleAddToList}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: addToList }}
+          accessibilityLabel="Also add to shopping list"
+          style={({ pressed }) => [styles.addToListRow, pressed && styles.pressed]}>
+          <View
+            style={[
+              styles.checkboxSm,
+              { borderColor: theme.textSecondary },
+              addToList && styles.checkboxSmChecked,
+            ]}>
+            {addToList && <ThemedText style={styles.checkmarkSm}>✓</ThemedText>}
+          </View>
+          <ThemedText type="small" numberOfLines={1} style={styles.flexShrink}>
+            Add “{descLabel}” to shopping list
+          </ThemedText>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -565,6 +750,30 @@ const styles = StyleSheet.create({
   },
   chipDot: { width: 10, height: 10, borderRadius: 5 },
   chipIcon: { fontSize: 15 },
+  linkSection: { gap: Spacing.one },
+  boughtRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.one },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  stepBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  stepBtnText: { fontSize: 20, fontWeight: '700', lineHeight: 22, color: Accent.primary },
+  stepValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 18,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  addToListRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.one },
+  checkboxSm: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSmChecked: { backgroundColor: Accent.primary, borderColor: Accent.primary },
+  checkmarkSm: { color: Accent.onPrimary, fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  flexShrink: { flexShrink: 1 },
   scrollContent: { paddingBottom: Spacing.four },
   addButton: {
     backgroundColor: Accent.primary,

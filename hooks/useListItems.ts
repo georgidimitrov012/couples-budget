@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import type { Update } from '../lib/db';
 import { useAuth } from './useAuth';
 
 export type ListItem = {
@@ -94,12 +95,15 @@ export function useListItems(listId: string | null) {
   }, [listId]);
 
   const addItem = useCallback(
-    async (name: string, opts?: { quantity?: number; category?: string }) => {
+    async (name: string, opts?: { quantity?: number; category?: string; checked?: boolean }) => {
       if (!listId || !name.trim()) return;
       const uid = userIdRef.current;
       const tempId = `temp-${Date.now()}`;
       const now = new Date().toISOString();
       const quantity = opts?.quantity && opts.quantity > 0 ? opts.quantity : 1;
+      // `checked` lets the Budget tab log an off-list purchase straight onto the
+      // list as already-bought (see completeItem for the on-list case).
+      const checked = opts?.checked ?? false;
 
       const optimistic: ListItem = {
         id: tempId,
@@ -107,9 +111,9 @@ export function useListItems(listId: string | null) {
         name: name.trim(),
         quantity,
         category: opts?.category ?? null,
-        is_checked: false,
+        is_checked: checked,
         added_by: uid ?? '',
-        checked_by: null,
+        checked_by: checked ? uid : null,
         created_at: now,
         updated_at: now,
       };
@@ -123,6 +127,8 @@ export function useListItems(listId: string | null) {
           quantity,
           category: opts?.category ?? null,
           added_by: uid ?? '',
+          is_checked: checked,
+          checked_by: checked ? uid : null,
         })
         .select()
         .single();
@@ -168,6 +174,25 @@ export function useListItems(listId: string | null) {
     }
   }, []);
 
+  // Quantity-aware completion driven by the Budget tab: when `purchased` covers
+  // the whole listed quantity the item is checked off; buying fewer leaves it on
+  // the list with the remaining quantity (Milk ×3, buy 1 → Milk ×2 stays).
+  const completeItem = useCallback(async (item: ListItem, purchased: number) => {
+    const uid = userIdRef.current;
+    const qty = Math.max(0, Math.floor(purchased));
+    if (qty <= 0) return;
+    const remaining = item.quantity - qty;
+    const patch: Update<'list_items'> =
+      remaining > 0 ? { quantity: remaining } : { is_checked: true, checked_by: uid };
+
+    setItems((prev) => upsert(prev, { ...item, ...patch } as ListItem));
+    const { error } = await supabase.from('list_items').update(patch).eq('id', item.id);
+    if (error) {
+      setItems((prev) => upsert(prev, item)); // revert
+      setError(error.message);
+    }
+  }, []);
+
   const removeItem = useCallback(async (item: ListItem) => {
     setItems((prev) => removeById(prev, item.id));
     const { error } = await supabase.from('list_items').delete().eq('id', item.id);
@@ -197,7 +222,18 @@ export function useListItems(listId: string | null) {
   // Re-runs the initial load, which also clears a stuck error (load or mutation).
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { items, loading, error, addItem, toggleItem, setQuantity, removeItem, clearChecked, retry };
+  return {
+    items,
+    loading,
+    error,
+    addItem,
+    toggleItem,
+    setQuantity,
+    completeItem,
+    removeItem,
+    clearChecked,
+    retry,
+  };
 }
 
 // Extension idea (Phase 4 "partner is editing" indicator): add a second hook that

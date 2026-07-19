@@ -4,6 +4,8 @@ const mockUseTransactions = jest.fn();
 const mockUseCategories = jest.fn();
 const mockUseHousehold = jest.fn();
 const mockUseSettleUp = jest.fn();
+const mockUseShoppingList = jest.fn();
+const mockUseListItems = jest.fn();
 jest.mock('../../hooks/useTransactions', () => ({ useTransactions: () => mockUseTransactions() }));
 jest.mock('../../hooks/useCategories', () => ({ useCategories: () => mockUseCategories() }));
 jest.mock('../../hooks/useAuth', () => {
@@ -12,6 +14,8 @@ jest.mock('../../hooks/useAuth', () => {
 });
 jest.mock('../../hooks/useHousehold', () => ({ useHousehold: () => mockUseHousehold() }));
 jest.mock('../../hooks/useSettleUp', () => ({ useSettleUp: () => mockUseSettleUp() }));
+jest.mock('../../hooks/useShoppingList', () => ({ useShoppingList: () => mockUseShoppingList() }));
+jest.mock('../../hooks/useListItems', () => ({ useListItems: (...a: unknown[]) => mockUseListItems(...a) }));
 
 import BudgetScreen from '../../src/app/(app)/(tabs)/budget';
 
@@ -82,12 +86,43 @@ const settleBase = {
   retry: jest.fn(),
 };
 
+type LI = {
+  id: string;
+  list_id: string;
+  name: string;
+  quantity: number;
+  category: string | null;
+  is_checked: boolean;
+  added_by: string;
+  checked_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+function listItem(over: Partial<LI> = {}): LI {
+  return {
+    id: 'i1',
+    list_id: 'L1',
+    name: 'Milk',
+    quantity: 1,
+    category: 'dairy',
+    is_checked: false,
+    added_by: 'u1',
+    checked_by: null,
+    created_at: '2020-01-01T00:00:00Z',
+    updated_at: '2020-01-01T00:00:00Z',
+    ...over,
+  };
+}
+const listBase = { items: [] as LI[], addItem: jest.fn(), completeItem: jest.fn() };
+
 beforeEach(() => {
   mockUseTransactions.mockReturnValue({ ...base });
   mockUseCategories.mockReturnValue({ categories: [] });
   // Solo by default so the settle card doesn't interfere with unrelated tests.
   mockUseHousehold.mockReturnValue(SOLO);
   mockUseSettleUp.mockReturnValue({ ...settleBase });
+  mockUseShoppingList.mockReturnValue({ listId: 'L1', loading: false, error: null, retry: jest.fn() });
+  mockUseListItems.mockReturnValue({ ...listBase });
 });
 
 describe('BudgetScreen', () => {
@@ -280,5 +315,84 @@ describe('BudgetScreen', () => {
     expect(screen.getByText('Groceries')).toBeTruthy();
     await user.press(screen.getByLabelText('Remove Groceries'));
     expect(removeTransaction).toHaveBeenCalled();
+  });
+
+  it('completes a linked list item when its full quantity is bought', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const completeItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Milk', quantity: 2 })],
+      completeItem,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '4');
+    await user.press(screen.getByLabelText('List item: Milk'));
+    await user.press(screen.getByLabelText('Add expense'));
+
+    // Description defaults to the linked item's name.
+    expect(addTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 4, description: 'Milk', scope: 'shared' })
+    );
+    expect(completeItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), 2);
+  });
+
+  it('leaves a remainder when fewer than the listed quantity are bought', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const completeItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Milk', quantity: 3 })],
+      completeItem,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '2');
+    await user.press(screen.getByLabelText('List item: Milk')); // bought defaults to 3
+    await user.press(screen.getByLabelText('Decrease quantity bought')); // → 2
+    await user.press(screen.getByLabelText('Decrease quantity bought')); // → 1
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(completeItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), 1);
+  });
+
+  it('adds an off-list item to the shopping list when the option is ticked', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const addItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({ ...listBase, addItem });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '3');
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Cookies');
+    await user.press(screen.getByLabelText('Also add to shopping list'));
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 3, description: 'Cookies' })
+    );
+    expect(addItem).toHaveBeenCalledWith('Cookies', expect.objectContaining({ checked: true }));
+  });
+
+  it('does not touch the shopping list for a plain expense (option left off)', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const addItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({ ...listBase, addItem });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '900');
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Rent');
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalled();
+    expect(addItem).not.toHaveBeenCalled();
   });
 });
