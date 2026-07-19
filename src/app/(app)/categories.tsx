@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { ScopeToggle } from '@/components/scope-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -208,11 +209,7 @@ export default function CategoriesScreen() {
               </ThemedText>
             </View>
           ) : categories.length === 0 ? (
-            <View style={styles.center}>
-              <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                {t('cat.empty')}
-              </ThemedText>
-            </View>
+            <EmptyState emoji="🏷️" title={t('cat.emptyTitle')} hint={t('cat.emptyHint')} />
           ) : (
             <FlatList
               data={categories}
