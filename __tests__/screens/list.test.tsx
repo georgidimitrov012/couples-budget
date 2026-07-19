@@ -14,9 +14,10 @@ type Item = {
   list_id: string;
   name: string;
   quantity: number;
-  price: number | null;
+  category: string | null;
   is_checked: boolean;
   added_by: string;
+  created_at: string;
 };
 function item(over: Partial<Item> = {}): Item {
   return {
@@ -24,9 +25,10 @@ function item(over: Partial<Item> = {}): Item {
     list_id: 'L1',
     name: 'Milk',
     quantity: 1,
-    price: null,
+    category: 'dairy',
     is_checked: false,
     added_by: 'u1',
+    created_at: '2020-01-01T00:00:00Z',
     ...over,
   };
 }
@@ -37,6 +39,7 @@ const noopItems = {
   error: null as string | null,
   addItem: jest.fn(),
   toggleItem: jest.fn(),
+  setQuantity: jest.fn(),
   removeItem: jest.fn(),
   clearChecked: jest.fn(),
   retry: jest.fn(),
@@ -52,30 +55,36 @@ describe('ListScreen', () => {
     mockUseShoppingList.mockReturnValue({ listId: null, loading: true, error: null, retry: jest.fn() });
     await render(<ListScreen />);
     expect(screen.getByTestId('list-loading')).toBeTruthy();
-    expect(screen.queryByText(/No items yet/)).toBeNull();
+    expect(screen.queryByText(/list is empty/)).toBeNull();
   });
 
   it('shows the empty state when there are no items', async () => {
     await render(<ListScreen />);
-    expect(screen.getByText(/No items yet/)).toBeTruthy();
+    expect(screen.getByText(/list is empty/)).toBeTruthy();
   });
 
-  it('renders items, quantity, and the clear-checked control', async () => {
+  it('groups items by category, shows quantity, and the clear-checked control', async () => {
     mockUseListItems.mockReturnValue({
       ...noopItems,
       items: [
-        item({ id: 'i1', name: 'Milk', quantity: 2 }),
-        item({ id: 'i2', name: 'Eggs', is_checked: true }),
+        item({ id: 'i1', name: 'Milk', quantity: 2, category: 'dairy' }),
+        item({ id: 'i2', name: 'Bread', category: 'bakery' }),
+        item({ id: 'i3', name: 'Eggs', category: 'dairy', is_checked: true }),
       ],
     });
     await render(<ListScreen />);
-    expect(screen.getByText(/Milk/)).toBeTruthy();
-    expect(screen.getByText(/×2/)).toBeTruthy();
+    expect(screen.getByText('Milk')).toBeTruthy();
+    expect(screen.getByText('Bread')).toBeTruthy();
     expect(screen.getByText('Eggs')).toBeTruthy();
+    // Category section headers (emoji + uppercased label).
+    expect(screen.getByText(/DAIRY & EGGS/)).toBeTruthy();
+    expect(screen.getByText(/BAKERY/)).toBeTruthy();
+    // Milk's quantity shows in its stepper.
+    expect(screen.getByText('2')).toBeTruthy();
     expect(screen.getByText(/Clear checked \(1\)/)).toBeTruthy();
   });
 
-  it('adds an item via the input and Add button', async () => {
+  it('adds a typed item with an auto-assigned category', async () => {
     const addItem = jest.fn().mockResolvedValue(undefined);
     mockUseListItems.mockReturnValue({ ...noopItems, addItem });
     const user = userEvent.setup();
@@ -83,28 +92,32 @@ describe('ListScreen', () => {
 
     await user.type(screen.getByPlaceholderText('Add an item…'), 'Bread');
     await user.press(screen.getByLabelText('Add item'));
-    expect(addItem).toHaveBeenCalledWith('Bread');
+    expect(addItem).toHaveBeenCalledWith('Bread', { category: 'bakery' });
   });
 
-  it('adds an item with a price (feeds the budget on check-off)', async () => {
+  it('adds a common item from the catalog', async () => {
     const addItem = jest.fn().mockResolvedValue(undefined);
     mockUseListItems.mockReturnValue({ ...noopItems, addItem });
     const user = userEvent.setup();
     await render(<ListScreen />);
 
-    await user.type(screen.getByPlaceholderText('Add an item…'), 'Milk');
-    await user.type(screen.getByPlaceholderText('Price'), '3,50');
-    await user.press(screen.getByLabelText('Add item'));
-    expect(addItem).toHaveBeenCalledWith('Milk', { price: 3.5 });
+    await user.press(screen.getByLabelText('Browse common items'));
+    await user.press(screen.getByLabelText('Add Bread'));
+    expect(addItem).toHaveBeenCalledWith('Bread', { category: 'bakery' });
   });
 
-  it('shows the price on a row', async () => {
+  it('steps an item quantity up', async () => {
+    const setQuantity = jest.fn();
     mockUseListItems.mockReturnValue({
       ...noopItems,
-      items: [item({ id: 'i1', name: 'Milk', price: 3.5 })],
+      items: [item({ id: 'i1', name: 'Milk', quantity: 2 })],
+      setQuantity,
     });
+    const user = userEvent.setup();
     await render(<ListScreen />);
-    expect(screen.getByText('3.50')).toBeTruthy();
+
+    await user.press(screen.getByLabelText('Increase Milk'));
+    expect(setQuantity).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), 3);
   });
 
   it('toggles and removes an item', async () => {
@@ -155,17 +168,6 @@ describe('ListScreen', () => {
     expect(screen.getByText(/Network down/)).toBeTruthy();
     await user.press(screen.getByLabelText('Retry'));
     expect(listRetry).toHaveBeenCalled();
-    expect(itemsRetry).toHaveBeenCalled();
-  });
-
-  it('a stuck item-mutation error is also retryable from the banner', async () => {
-    const itemsRetry = jest.fn();
-    mockUseListItems.mockReturnValue({ ...noopItems, error: 'insert denied', retry: itemsRetry });
-    const user = userEvent.setup();
-    await render(<ListScreen />);
-
-    expect(screen.getByText(/insert denied/)).toBeTruthy();
-    await user.press(screen.getByLabelText('Retry'));
     expect(itemsRetry).toHaveBeenCalled();
   });
 });

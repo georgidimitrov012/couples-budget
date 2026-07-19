@@ -176,8 +176,9 @@ create table public.list_items (
   list_id     uuid not null references public.shopping_lists(id) on delete cascade,
   name        text not null,
   quantity    int not null default 1,
-  price       numeric(12,2),                                  -- optional: feeds budget on check-off
+  price       numeric(12,2),                                  -- legacy/unused: the list no longer tracks price
   category_id uuid references public.categories(id) on delete set null,
+  category    text,                                           -- grocery aisle key (see lib/groceries.ts); groups the list
   is_checked  boolean not null default false,
   added_by    uuid not null references auth.users(id),
   checked_by  uuid references auth.users(id),
