@@ -30,6 +30,36 @@ const CATEGORY_COLORS = [
   '#60646c',
 ];
 
+// Emoji icons for budget categories (stored in categories.icon).
+const CATEGORY_ICONS = [
+  '🛒', '🍽️', '🏠', '💡', '🚗', '⛽', '🎬', '🏥',
+  '💊', '👕', '🎁', '✈️', '📱', '🐾', '🎓', '☕',
+  '🍺', '🏋️', '💰', '🧾',
+];
+
+function IconPicker({ selected, onSelect }: { selected: string | null; onSelect: (icon: string) => void }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.iconRow}>
+      {CATEGORY_ICONS.map((emoji) => (
+        <Pressable
+          key={emoji}
+          onPress={() => onSelect(emoji)}
+          accessibilityRole="button"
+          accessibilityLabel={`Icon ${emoji}`}
+          accessibilityState={{ selected: selected === emoji }}
+          style={[
+            styles.iconOption,
+            { borderColor: theme.backgroundSelected },
+            selected === emoji && { borderColor: Accent.primary, backgroundColor: theme.tint },
+          ]}>
+          <ThemedText style={styles.iconEmoji}>{emoji}</ThemedText>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 export default function CategoriesScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -38,6 +68,7 @@ export default function CategoriesScreen() {
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
+  const [icon, setIcon] = useState(CATEGORY_ICONS[0]);
   const [scope, setScope] = useState<CategoryScope>('shared');
   const [limit, setLimit] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -50,6 +81,7 @@ export default function CategoriesScreen() {
     const { error: addError } = await addCategory({
       name,
       color,
+      icon,
       scope,
       monthlyLimit: parseAmount(limit),
     });
@@ -61,6 +93,7 @@ export default function CategoriesScreen() {
     setName('');
     setScope('shared');
     setColor(CATEGORY_COLORS[0]);
+    setIcon(CATEGORY_ICONS[0]);
     setLimit('');
     setSaving(false);
   }
@@ -100,6 +133,8 @@ export default function CategoriesScreen() {
               returnKeyType="done"
               onSubmitEditing={handleAdd}
             />
+
+            <IconPicker selected={icon} onSelect={setIcon} />
 
             <View style={styles.swatchRow}>
               {CATEGORY_COLORS.map((c) => (
@@ -185,6 +220,7 @@ export default function CategoriesScreen() {
                   category={item}
                   canEdit={item.owner_id === user?.id}
                   onSetLimit={(next) => handleSetLimit(item, next)}
+                  onSetIcon={(emoji) => updateCategory(item, { icon: emoji })}
                   onRemove={() => removeCategory(item)}
                 />
               )}
@@ -200,46 +236,72 @@ function CategoryRow({
   category,
   canEdit,
   onSetLimit,
+  onSetIcon,
   onRemove,
 }: {
   category: Category;
   canEdit: boolean;
   onSetLimit: (next: number | null) => void;
+  onSetIcon: (icon: string) => void;
   onRemove: () => void;
 }) {
+  const [editingIcon, setEditingIcon] = useState(false);
   return (
-    <ThemedView type="backgroundElement" style={styles.row}>
-      <View style={[styles.dot, { backgroundColor: category.color ?? '#60646c' }]} />
-      <View style={styles.rowMain}>
-        <ThemedText style={styles.rowName} numberOfLines={1}>
-          {category.name}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {category.scope === 'shared' ? 'Ours' : 'Mine'}
-        </ThemedText>
-      </View>
-      {canEdit ? (
-        <LimitInput
-          categoryName={category.name}
-          value={category.monthly_limit}
-          onCommit={onSetLimit}
-        />
-      ) : category.monthly_limit != null ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          Limit {category.monthly_limit}
-        </ThemedText>
-      ) : null}
-      {canEdit && (
+    <ThemedView type="backgroundElement" style={styles.rowCard}>
+      <View style={styles.rowTop}>
         <Pressable
-          onPress={onRemove}
+          onPress={() => canEdit && setEditingIcon((v) => !v)}
+          disabled={!canEdit}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${category.name}`}
-          hitSlop={8}
-          style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
-          <ThemedText type="small" themeColor="textSecondary">
-            ✕
-          </ThemedText>
+          accessibilityLabel={canEdit ? `Change icon for ${category.name}` : undefined}
+          hitSlop={6}
+          style={styles.iconBadge}>
+          {category.icon ? (
+            <ThemedText style={styles.rowIcon}>{category.icon}</ThemedText>
+          ) : (
+            <View style={[styles.dot, { backgroundColor: category.color ?? '#60646c' }]} />
+          )}
         </Pressable>
+        <View style={styles.rowMain}>
+          <ThemedText style={styles.rowName} numberOfLines={1}>
+            {category.name}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {category.scope === 'shared' ? 'Ours' : 'Mine'}
+          </ThemedText>
+        </View>
+        {canEdit ? (
+          <LimitInput
+            categoryName={category.name}
+            value={category.monthly_limit}
+            onCommit={onSetLimit}
+          />
+        ) : category.monthly_limit != null ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            Limit {category.monthly_limit}
+          </ThemedText>
+        ) : null}
+        {canEdit && (
+          <Pressable
+            onPress={onRemove}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${category.name}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
+            <ThemedText type="small" themeColor="textSecondary">
+              ✕
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
+      {editingIcon && canEdit && (
+        <IconPicker
+          selected={category.icon}
+          onSelect={(emoji) => {
+            onSetIcon(emoji);
+            setEditingIcon(false);
+          }}
+        />
       )}
     </ThemedView>
   );
@@ -311,6 +373,26 @@ const styles = StyleSheet.create({
   },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   swatch: { width: 32, height: 32, borderRadius: 16 },
+  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  iconOption: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconEmoji: { fontSize: 20 },
+  rowCard: {
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    gap: Spacing.three,
+    ...Shadow.card,
+  },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  iconBadge: { width: 32, alignItems: 'center', justifyContent: 'center' },
+  rowIcon: { fontSize: 22 },
   formRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   addButton: {
     backgroundColor: Accent.primary,

@@ -2,7 +2,6 @@ import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -111,123 +110,128 @@ export default function BudgetScreen() {
             </Link>
           </View>
 
-          <View style={styles.summaryRow}>
-            <SummaryCard label="Ours" sublabel="this month" value={oursTotal} tone="ours" />
-            <SummaryCard label="Mine" sublabel="this month" value={mineTotal} tone="mine" />
-          </View>
-
-          {partner && (
-            <SettleCard
-              partnerName={partner.display_name ?? 'Your partner'}
-              myName={myName}
-              balance={settle.balance}
-              lastSettledOn={settle.lastSettledOn}
-              settling={settle.settling}
-              error={settle.error}
-              onSettle={settle.settleUp}
-            />
-          )}
-
-          {budgets.length > 0 && (
-            <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
-          )}
-
-          <ThemedView type="backgroundElement" style={styles.addCard}>
-            <View style={styles.amountRow}>
-              <TextInput
-                style={[styles.amountInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-                placeholder="0.00"
-                placeholderTextColor={theme.textSecondary}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-              />
-              <ScopeToggle scope={scope} onChange={setScope} />
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.summaryRow}>
+              <SummaryCard label="Ours" sublabel="this month" value={oursTotal} tone="ours" />
+              <SummaryCard label="Mine" sublabel="this month" value={mineTotal} tone="mine" />
             </View>
-            <TextInput
-              style={[
-                styles.descInput,
-                { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
-              ]}
-              placeholder="What was it for? (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={description}
-              onChangeText={setDescription}
-              returnKeyType="done"
-              onSubmitEditing={handleAdd}
-            />
 
-            {categories.length > 0 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipRow}>
-                <CategoryChip
-                  label="None"
-                  active={categoryId === null}
-                  onPress={() => setCategoryId(null)}
-                />
-                {categories.map((c) => (
-                  <CategoryChip
-                    key={c.id}
-                    label={c.name}
-                    color={c.color}
-                    active={categoryId === c.id}
-                    onPress={() => setCategoryId(c.id)}
-                  />
-                ))}
-              </ScrollView>
+            {partner && (
+              <SettleCard
+                partnerName={partner.display_name ?? 'Your partner'}
+                myName={myName}
+                balance={settle.balance}
+                lastSettledOn={settle.lastSettledOn}
+                settling={settle.settling}
+                error={settle.error}
+                onSettle={settle.settleUp}
+              />
             )}
 
-            <Pressable
-              onPress={handleAdd}
-              disabled={!canAdd}
-              accessibilityRole="button"
-              accessibilityLabel="Add expense"
-              style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
-              <ThemedText style={styles.addButtonText}>Add expense</ThemedText>
-            </Pressable>
-          </ThemedView>
+            {budgets.length > 0 && (
+              <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
+            )}
 
-          {error && (
-            <Pressable
-              onPress={retry}
-              accessibilityRole="button"
-              accessibilityLabel="Retry"
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.banner}>
-                <ThemedText type="small" style={styles.bannerText}>
-                  {error} — tap to retry
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
-          )}
-
-          {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator testID="budget-loading" />
-            </View>
-          ) : items.length === 0 ? (
-            <View style={styles.center}>
-              <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                No expenses yet.{'\n'}Add your first one above.
-              </ThemedText>
-            </View>
-          ) : (
-            <FlatList
-              data={items}
-              keyExtractor={(t) => t.id}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => (
-                <TransactionRow
-                  item={item}
-                  category={item.category_id ? categoryById.get(item.category_id) : undefined}
-                  onRemove={() => removeTransaction(item)}
+            <ThemedView type="backgroundElement" style={styles.addCard}>
+              <View style={styles.amountRow}>
+                <TextInput
+                  style={[styles.amountInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                  placeholder="0.00"
+                  placeholderTextColor={theme.textSecondary}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
                 />
+                <ScopeToggle scope={scope} onChange={setScope} />
+              </View>
+              <TextInput
+                style={[
+                  styles.descInput,
+                  { color: theme.text, backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+                ]}
+                placeholder="What was it for? (optional)"
+                placeholderTextColor={theme.textSecondary}
+                value={description}
+                onChangeText={setDescription}
+                returnKeyType="done"
+                onSubmitEditing={handleAdd}
+              />
+
+              {categories.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.chipRow}>
+                  <CategoryChip
+                    label="None"
+                    active={categoryId === null}
+                    onPress={() => setCategoryId(null)}
+                  />
+                  {categories.map((c) => (
+                    <CategoryChip
+                      key={c.id}
+                      label={c.name}
+                      color={c.color}
+                      icon={c.icon}
+                      active={categoryId === c.id}
+                      onPress={() => setCategoryId(c.id)}
+                    />
+                  ))}
+                </ScrollView>
               )}
-            />
-          )}
+
+              <Pressable
+                onPress={handleAdd}
+                disabled={!canAdd}
+                accessibilityRole="button"
+                accessibilityLabel="Add expense"
+                style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
+                <ThemedText style={styles.addButtonText}>Add expense</ThemedText>
+              </Pressable>
+            </ThemedView>
+
+            {error && (
+              <Pressable
+                onPress={retry}
+                accessibilityRole="button"
+                accessibilityLabel="Retry"
+                style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedView type="backgroundElement" style={styles.banner}>
+                  <ThemedText type="small" style={styles.bannerText}>
+                    {error} — tap to retry
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
+            )}
+
+            {loading ? (
+              <View style={styles.center}>
+                <ActivityIndicator testID="budget-loading" />
+              </View>
+            ) : items.length === 0 ? (
+              <View style={styles.center}>
+                <ThemedText themeColor="textSecondary" style={styles.centerText}>
+                  No expenses yet.{'\n'}Add your first one above.
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={styles.listContent}>
+                {items.map((item) => (
+                  <TransactionRow
+                    key={item.id}
+                    item={item}
+                    category={item.category_id ? categoryById.get(item.category_id) : undefined}
+                    onRemove={() => removeTransaction(item)}
+                  />
+                ))}
+              </View>
+            )}
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
@@ -373,11 +377,13 @@ function SummaryCard({
 function CategoryChip({
   label,
   color,
+  icon,
   active,
   onPress,
 }: {
   label: string;
   color?: string | null;
+  icon?: string | null;
   active: boolean;
   onPress: () => void;
 }) {
@@ -393,7 +399,11 @@ function CategoryChip({
         { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
         active && { borderColor: Accent.primary },
       ]}>
-      {color ? <View style={[styles.chipDot, { backgroundColor: color }]} /> : null}
+      {icon ? (
+        <ThemedText style={styles.chipIcon}>{icon}</ThemedText>
+      ) : color ? (
+        <View style={[styles.chipDot, { backgroundColor: color }]} />
+      ) : null}
       <ThemedText type="small" themeColor={active ? 'text' : 'textSecondary'}>
         {label}
       </ThemedText>
@@ -431,7 +441,11 @@ function TransactionRow({
           </View>
           {category ? (
             <View style={styles.rowCategory}>
-              <View style={[styles.chipDot, { backgroundColor: category.color ?? '#60646c' }]} />
+              {category.icon ? (
+                <ThemedText type="small">{category.icon}</ThemedText>
+              ) : (
+                <View style={[styles.chipDot, { backgroundColor: category.color ?? '#60646c' }]} />
+              )}
               <ThemedText type="small" themeColor="textSecondary">
                 {category.name}
               </ThemedText>
@@ -550,6 +564,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   chipDot: { width: 10, height: 10, borderRadius: 5 },
+  chipIcon: { fontSize: 15 },
+  scrollContent: { paddingBottom: Spacing.four },
   addButton: {
     backgroundColor: Accent.primary,
     borderRadius: Spacing.two,

@@ -12,6 +12,7 @@ type Cat = {
   owner_id: string;
   name: string;
   color: string | null;
+  icon: string | null;
   scope: 'private' | 'shared';
   monthly_limit: number | null;
 };
@@ -22,6 +23,7 @@ function cat(over: Partial<Cat> = {}): Cat {
     owner_id: 'u1',
     name: 'Food',
     color: '#3c87f7',
+    icon: null,
     scope: 'shared',
     monthly_limit: null,
     ...over,
@@ -29,6 +31,7 @@ function cat(over: Partial<Cat> = {}): Cat {
 }
 
 const FIRST_COLOR = '#e5484d';
+const FIRST_ICON = '🛒';
 
 function mockCategories(over: Partial<ReturnType<typeof baseValue>> = {}) {
   mockUseCategories.mockReturnValue({ ...baseValue(), ...over });
@@ -70,9 +73,36 @@ describe('CategoriesScreen', () => {
     expect(addCategory).toHaveBeenCalledWith({
       name: 'Groceries',
       color: FIRST_COLOR,
+      icon: FIRST_ICON,
       scope: 'shared',
       monthlyLimit: null,
     });
+  });
+
+  it('adds a category with a chosen icon', async () => {
+    const addCategory = jest.fn().mockResolvedValue({ error: null });
+    mockCategories({ addCategory });
+    const user = userEvent.setup();
+    await render(<CategoriesScreen />);
+
+    await user.type(screen.getByPlaceholderText('Category name'), 'Home');
+    await user.press(screen.getByLabelText('Icon 🏠'));
+    await user.press(screen.getByLabelText('Add category'));
+    expect(addCategory).toHaveBeenCalledWith(expect.objectContaining({ name: 'Home', icon: '🏠' }));
+  });
+
+  it('changes an existing category icon (owner)', async () => {
+    const updateCategory = jest.fn().mockResolvedValue({ error: null });
+    const food = cat({ id: 'c1', name: 'Food', owner_id: 'u1' });
+    mockCategories({ categories: [food], updateCategory });
+    const user = userEvent.setup();
+    await render(<CategoriesScreen />);
+
+    await user.press(screen.getByLabelText('Change icon for Food'));
+    // The add form also has an icon picker; the row's picker is the last one.
+    const options = screen.getAllByLabelText('Icon 🏠');
+    await user.press(options[options.length - 1]);
+    expect(updateCategory).toHaveBeenCalledWith(food, { icon: '🏠' });
   });
 
   it('adds a category with a monthly limit', async () => {
@@ -87,6 +117,7 @@ describe('CategoriesScreen', () => {
     expect(addCategory).toHaveBeenCalledWith({
       name: 'Groceries',
       color: FIRST_COLOR,
+      icon: FIRST_ICON,
       scope: 'shared',
       monthlyLimit: 300,
     });
@@ -126,6 +157,7 @@ describe('CategoriesScreen', () => {
     expect(addCategory).toHaveBeenCalledWith({
       name: 'Personal',
       color: FIRST_COLOR,
+      icon: FIRST_ICON,
       scope: 'private',
       monthlyLimit: null,
     });

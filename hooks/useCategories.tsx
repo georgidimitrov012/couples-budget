@@ -12,15 +12,17 @@ export type Category = {
   owner_id: string;
   name: string;
   color: string | null;
+  icon: string | null;
   scope: CategoryScope;
   monthly_limit: number | null;
 };
 
-const COLUMNS = 'id, household_id, owner_id, name, color, scope, monthly_limit';
+const COLUMNS = 'id, household_id, owner_id, name, color, icon, scope, monthly_limit';
 
 export type CategoryPatch = {
   name?: string;
   color?: string | null;
+  icon?: string | null;
   scope?: CategoryScope;
   monthlyLimit?: number | null;
 };
@@ -33,6 +35,7 @@ type CategoriesContextValue = {
   addCategory: (input: {
     name: string;
     color?: string;
+    icon?: string;
     scope: CategoryScope;
     monthlyLimit?: number | null;
   }) => Promise<{ error: string | null }>;
@@ -109,6 +112,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     async (input: {
       name: string;
       color?: string;
+      icon?: string;
       scope: CategoryScope;
       monthlyLimit?: number | null;
     }) => {
@@ -124,6 +128,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           owner_id: uid,
           name,
           color: input.color ?? null,
+          icon: input.icon ?? null,
           scope: input.scope,
           monthly_limit: input.monthlyLimit ?? null,
         })
@@ -149,6 +154,10 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (patch.color !== undefined) {
         dbPatch.color = patch.color;
         local.color = patch.color;
+      }
+      if (patch.icon !== undefined) {
+        dbPatch.icon = patch.icon;
+        local.icon = patch.icon;
       }
       if (patch.scope !== undefined) {
         dbPatch.scope = patch.scope;
