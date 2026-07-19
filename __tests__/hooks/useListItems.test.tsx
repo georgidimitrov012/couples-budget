@@ -267,6 +267,22 @@ describe('useListItems', () => {
     expect(result.current.items.some((i) => i.id === 'rt1')).toBe(false);
   });
 
+  it('uses a unique channel name per instance (no cross-tab realtime collision)', async () => {
+    // The List tab and the Budget tab both subscribe to the same list. Reusing
+    // one channel topic makes the second .on()-after-subscribe() throw, which
+    // crashed the app on launch. Each instance must get its own channel name.
+    mockChannel.mockClear();
+    const a = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    const b = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    const names = mockChannel.mock.calls.map((c) => String(c[0]));
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    expect(names.every((n) => n.startsWith('list:L1'))).toBe(true);
+    expect(new Set(names).size).toBe(names.length); // all distinct
+  });
+
   it('removes the realtime channel on unmount', async () => {
     const { unmount, result } = await renderHook(() => useListItems('L1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
