@@ -80,7 +80,11 @@ const en: Dict = {
   'home.shareCode': 'SHARE THIS CODE WITH YOUR PARTNER',
   'home.waiting': 'Waiting for your partner to join…',
   'home.regenerate': 'Regenerate code',
-  'home.bothSetUp': "You're both set up. Next up: your shared shopping list and budget.",
+  'home.nextSteps': 'NEXT STEPS',
+  'home.stepListTitle': 'Start your shopping list',
+  'home.stepListBody': 'Add what you need — it stays in sync on both phones.',
+  'home.stepBudgetTitle': 'Log your first expense',
+  'home.stepBudgetBody': 'Track Ours and Mine, and settle up fairly.',
 
   // Shopping list
   'list.title': 'Shopping list',
@@ -314,7 +318,11 @@ const bg: Dict = {
   'home.shareCode': 'СПОДЕЛИ ТОЗИ КОД С ПАРТНЬОРА СИ',
   'home.waiting': 'Изчакване партньорът ти да се присъедини…',
   'home.regenerate': 'Нов код',
-  'home.bothSetUp': 'Готови сте. Следва: общият ви списък за пазаруване и бюджет.',
+  'home.nextSteps': 'СЛЕДВАЩИ СТЪПКИ',
+  'home.stepListTitle': 'Започни списъка за пазаруване',
+  'home.stepListBody': 'Добави каквото ти трябва — синхронизира се на двата телефона.',
+  'home.stepBudgetTitle': 'Запиши първия си разход',
+  'home.stepBudgetBody': 'Следи Общи и Лични и се изравнявайте честно.',
 
   // Shopping list
   'list.title': 'Списък за пазаруване',

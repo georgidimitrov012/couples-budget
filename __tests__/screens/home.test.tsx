@@ -4,6 +4,10 @@ import { render, screen, fireEvent, userEvent, waitFor } from '@testing-library/
 const mockUseHousehold = jest.fn();
 const mockSignOut = jest.fn();
 const mockUseIntroSeen = jest.fn();
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+}));
 jest.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { email: 'a@b.com', user_metadata: { display_name: 'Alice' } } }),
 }));
@@ -17,6 +21,7 @@ import HomeScreen from '../../src/app/(app)/(tabs)/index';
 
 beforeEach(() => {
   mockSignOut.mockResolvedValue({ error: null });
+  mockPush.mockClear();
   // Intro already dismissed by default so it doesn't overlay the other tests.
   mockUseIntroSeen.mockReturnValue({ seen: true, ready: true, markSeen: jest.fn() });
 });
@@ -32,14 +37,26 @@ describe('HomeScreen', () => {
     expect(screen.getByText(/Waiting for your partner/)).toBeTruthy();
   });
 
-  it('shows the "both set up" state once the partner joins', async () => {
+  it('shows next-step cards once the partner joins', async () => {
     mockUseHousehold.mockReturnValue({
       household: { name: 'Our Home', invite_code: 'ABC123' },
       members: [{ user_id: 'u1' }, { user_id: 'u2' }],
     });
     await render(<HomeScreen />);
-    expect(screen.getByText(/both set up/)).toBeTruthy();
+    expect(screen.getByText('Start your shopping list')).toBeTruthy();
+    expect(screen.getByText('Log your first expense')).toBeTruthy();
     expect(screen.queryByText('ABC123')).toBeNull();
+  });
+
+  it('deep-links to a tab from a next-step card', async () => {
+    mockUseHousehold.mockReturnValue({
+      household: { name: 'Our Home', invite_code: 'ABC123' },
+      members: [{ user_id: 'u1' }, { user_id: 'u2' }],
+    });
+    const user = userEvent.setup();
+    await render(<HomeScreen />);
+    await user.press(screen.getByLabelText('Start your shopping list'));
+    expect(mockPush).toHaveBeenCalledWith('/list');
   });
 
   it('signs out when the button is pressed', async () => {
