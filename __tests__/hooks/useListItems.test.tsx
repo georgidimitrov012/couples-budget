@@ -170,6 +170,60 @@ describe('useListItems', () => {
     expect(result.current.items[0].quantity).toBe(1);
   });
 
+  it('adds an item pre-checked (an off-list purchase logged from the budget)', async () => {
+    results.insert = {
+      data: row({ id: 'real1', name: 'Cookies', is_checked: true, checked_by: 'u1' }),
+      error: null,
+    };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.addItem('Cookies', { checked: true });
+    });
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Cookies', is_checked: true, checked_by: 'u1' })
+    );
+    expect(result.current.items.some((i) => i.id === 'real1' && i.is_checked)).toBe(true);
+  });
+
+  it('completeItem checks the item off when the full quantity is bought', async () => {
+    results.select = { data: [row({ id: 'i1', quantity: 2, is_checked: false })], error: null };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.completeItem(result.current.items[0], 2);
+    });
+    expect(result.current.items[0].is_checked).toBe(true);
+    expect(result.current.items[0].checked_by).toBe('u1');
+    expect(result.current.items[0].quantity).toBe(2);
+  });
+
+  it('completeItem leaves the remainder on the list when fewer are bought', async () => {
+    results.select = { data: [row({ id: 'i1', quantity: 3, is_checked: false })], error: null };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.completeItem(result.current.items[0], 1);
+    });
+    expect(result.current.items[0].is_checked).toBe(false);
+    expect(result.current.items[0].quantity).toBe(2);
+  });
+
+  it('completeItem ignores a non-positive quantity', async () => {
+    results.select = { data: [row({ id: 'i1', quantity: 2, is_checked: false })], error: null };
+    const { result } = await renderHook(() => useListItems('L1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.completeItem(result.current.items[0], 0);
+    });
+    expect(result.current.items[0].quantity).toBe(2);
+    expect(result.current.items[0].is_checked).toBe(false);
+  });
+
   it('removes an item', async () => {
     results.select = { data: [row({ id: 'i1' })], error: null };
     const { result } = await renderHook(() => useListItems('L1'));
