@@ -41,6 +41,13 @@ export function useListItems(listId: string | null) {
   const userIdRef = useRef<string | null>(user?.id ?? null);
   userIdRef.current = user?.id ?? null;
 
+  // A per-instance channel id. Both the List tab and the Budget tab subscribe to
+  // the same list, and Supabase keys channels by topic name — reusing one name
+  // would make the second subscriber call `.on()` on an already-subscribed
+  // channel, which throws. A unique suffix gives each hook its own channel
+  // (postgres_changes still filters by `list_id`, not the topic name).
+  const channelIdRef = useRef(Math.random().toString(36).slice(2));
+
   const [items, setItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +82,7 @@ export function useListItems(listId: string | null) {
   useEffect(() => {
     if (!listId) return;
     const channel: RealtimeChannel = supabase
-      .channel(`list:${listId}`)
+      .channel(`list:${listId}:${channelIdRef.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'list_items', filter: `list_id=eq.${listId}` },
