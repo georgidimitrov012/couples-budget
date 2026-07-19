@@ -3,17 +3,23 @@ import { render, screen, fireEvent, userEvent, waitFor } from '@testing-library/
 
 const mockUseHousehold = jest.fn();
 const mockSignOut = jest.fn();
+const mockUseIntroSeen = jest.fn();
 jest.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { email: 'a@b.com', user_metadata: { display_name: 'Alice' } } }),
 }));
 jest.mock('../../hooks/useHousehold', () => ({ useHousehold: () => mockUseHousehold() }));
+jest.mock('../../hooks/useIntroSeen', () => ({ useIntroSeen: () => mockUseIntroSeen() }));
 jest.mock('../../lib/supabase', () => ({
   supabase: { auth: { signOut: (...a: unknown[]) => mockSignOut(...a) } },
 }));
 
 import HomeScreen from '../../src/app/(app)/(tabs)/index';
 
-beforeEach(() => mockSignOut.mockResolvedValue({ error: null }));
+beforeEach(() => {
+  mockSignOut.mockResolvedValue({ error: null });
+  // Intro already dismissed by default so it doesn't overlay the other tests.
+  mockUseIntroSeen.mockReturnValue({ seen: true, ready: true, markSeen: jest.fn() });
+});
 
 describe('HomeScreen', () => {
   it('shows the invite code + waiting state with a single member', async () => {
@@ -66,5 +72,29 @@ describe('HomeScreen', () => {
     await render(<HomeScreen />);
     await user.press(screen.getByLabelText('Regenerate code'));
     await waitFor(() => expect(regenerateInviteCode).toHaveBeenCalled());
+  });
+
+  it('shows the first-run explainer and dismisses it', async () => {
+    const markSeen = jest.fn();
+    mockUseIntroSeen.mockReturnValue({ seen: false, ready: true, markSeen });
+    mockUseHousehold.mockReturnValue({
+      household: { name: 'Our Home', invite_code: 'ABC123' },
+      members: [{ user_id: 'u1' }, { user_id: 'u2' }],
+    });
+    const user = userEvent.setup();
+    await render(<HomeScreen />);
+    expect(screen.getByText('How this works')).toBeTruthy();
+    await user.press(screen.getByLabelText('Got it'));
+    expect(markSeen).toHaveBeenCalled();
+  });
+
+  it('does not show the explainer once it has been seen', async () => {
+    mockUseIntroSeen.mockReturnValue({ seen: true, ready: true, markSeen: jest.fn() });
+    mockUseHousehold.mockReturnValue({
+      household: { name: 'Our Home', invite_code: 'ABC123' },
+      members: [{ user_id: 'u1' }, { user_id: 'u2' }],
+    });
+    await render(<HomeScreen />);
+    expect(screen.queryByText('How this works')).toBeNull();
   });
 });

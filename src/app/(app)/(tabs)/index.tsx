@@ -4,11 +4,13 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { IntroOverlay } from '@/components/intro-overlay';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useHousehold } from '../../../../hooks/useHousehold';
+import { useIntroSeen } from '../../../../hooks/useIntroSeen';
 import { useTranslation } from '../../../../hooks/useTranslation';
 import { supabase } from '../../../../lib/supabase';
 
@@ -17,6 +19,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { household, members, regenerateInviteCode } = useHousehold();
+  const { seen: introSeen, ready: introReady, markSeen } = useIntroSeen();
   const [signingOut, setSigningOut] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
@@ -114,6 +117,8 @@ export default function HomeScreen() {
           )}
         </Pressable>
       </SafeAreaView>
+
+      {introReady && !introSeen && <IntroOverlay onDismiss={markSeen} />}
     </ThemedView>
   );
 }
