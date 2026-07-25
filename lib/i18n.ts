@@ -187,6 +187,25 @@ const en: Dict = {
     'Bought something? Log it in Budget and it ticks off your list. Buy fewer than planned and the rest stays.',
   'intro.gotIt': 'Got it',
 
+  // Statistics
+  'stats.title': 'Statistics',
+  'stats.spentThisMonth': 'SPENT THIS MONTH',
+  'stats.deltaUp': '↑ {pct}% vs last month',
+  'stats.deltaDown': '↓ {pct}% vs last month',
+  'stats.deltaFlat': 'Same as last month',
+  'stats.noBaseline': 'No last-month data yet',
+  'stats.expenses': 'Expenses',
+  'stats.avg': 'Avg / expense',
+  'stats.biggest': 'Biggest',
+  'stats.byCategory': 'WHERE IT WENT',
+  'stats.uncategorized': 'Uncategorized',
+  'stats.shopping': 'SHOPPING LIST',
+  'stats.toBuy': 'To buy',
+  'stats.bought': 'Bought',
+  'stats.emptyTitle': 'No spending yet',
+  'stats.emptyHint':
+    'Add expenses on the Budget tab and your monthly stats will show up here.',
+
   // Grocery aisle labels (keyed by GroceryCategoryKey)
   'grocery.produce': 'Vegetables',
   'grocery.fruit': 'Fruit',
@@ -423,6 +442,25 @@ const bg: Dict = {
   'intro.linkBody':
     'Купи ли нещо? Запиши го в Бюджет и то се отмята от списъка. Купиш ли по-малко, остатъкът остава.',
   'intro.gotIt': 'Разбрах',
+
+  // Statistics
+  'stats.title': 'Статистика',
+  'stats.spentThisMonth': 'ПОХАРЧЕНО ТОЗИ МЕСЕЦ',
+  'stats.deltaUp': '↑ {pct}% спрямо миналия месец',
+  'stats.deltaDown': '↓ {pct}% спрямо миналия месец',
+  'stats.deltaFlat': 'Колкото миналия месец',
+  'stats.noBaseline': 'Още няма данни за миналия месец',
+  'stats.expenses': 'Разходи',
+  'stats.avg': 'Средно / разход',
+  'stats.biggest': 'Най-голям',
+  'stats.byCategory': 'КЪДЕ ОТИДЕ',
+  'stats.uncategorized': 'Без категория',
+  'stats.shopping': 'СПИСЪК ЗА ПАЗАРУВАНЕ',
+  'stats.toBuy': 'За купуване',
+  'stats.bought': 'Купени',
+  'stats.emptyTitle': 'Още няма разходи',
+  'stats.emptyHint':
+    'Добави разходи в раздел Бюджет и месечната ти статистика ще се появи тук.',
 
   // Grocery aisle labels
   'grocery.produce': 'Зеленчуци',
