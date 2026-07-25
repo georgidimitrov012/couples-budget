@@ -21,10 +21,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
-import { formatAmount, parseAmount } from '../../../../lib/format';
+import { parseAmount } from '../../../../lib/format';
 import { categorize } from '../../../../lib/groceries';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
+import { useCurrency } from '../../../../hooks/useCurrency';
 import { useHousehold } from '../../../../hooks/useHousehold';
 import { useListItems, type ListItem } from '../../../../hooks/useListItems';
 import { useSettleUp } from '../../../../hooks/useSettleUp';
@@ -344,8 +345,9 @@ function SettleCard({
   onSettle: () => void;
 }) {
   const { t } = useTranslation();
+  const { format } = useCurrency();
   const square = Math.round(balance * 100) === 0;
-  const owed = formatAmount(Math.abs(balance));
+  const owed = format(Math.abs(balance));
   return (
     <ThemedView type="backgroundElement" style={[styles.settleCard, Shadow.card]}>
       <View style={styles.settleAvatars}>
@@ -404,6 +406,7 @@ function CategoryBudgets({
   spendByCategory: Map<string, number>;
 }) {
   const { t } = useTranslation();
+  const { format } = useCurrency();
   return (
     <ThemedView type="backgroundElement" style={styles.budgetsCard} testID="category-budgets">
       <ThemedText type="smallBold" themeColor="textSecondary">
@@ -424,7 +427,7 @@ function CategoryBudgets({
                 themeColor="textSecondary"
                 style={[styles.budgetAmount, over && styles.overText]}
                 testID={`budget-amount-${c.id}`}>
-                {formatAmount(spent)} / {formatAmount(limit)}
+                {format(spent)} / {format(limit)}
               </ThemedText>
             </View>
             <ProgressBar ratio={ratio} color={over ? Accent.danger : c.color ?? Accent.primary} />
@@ -446,6 +449,7 @@ function SummaryCard({
   value: number;
   tone: 'ours' | 'mine';
 }) {
+  const { format } = useCurrency();
   return (
     <View style={[styles.summaryCard, { backgroundColor: Accent[tone] }, Shadow.card]}>
       <ThemedText type="smallBold" style={styles.summaryLabel}>
@@ -455,7 +459,7 @@ function SummaryCard({
         type="subtitle"
         testID={`summary-${label.toLowerCase()}`}
         style={styles.summaryValue}>
-        {formatAmount(value)}
+        {format(value)}
       </ThemedText>
       <ThemedText type="small" style={styles.summarySub}>
         {sublabel}
@@ -636,6 +640,7 @@ function TransactionRow({
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const { format } = useCurrency();
   const desc = item.description || t('budget.expense');
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
@@ -670,7 +675,7 @@ function TransactionRow({
           ) : null}
         </View>
       </View>
-      <ThemedText style={styles.rowAmount}>{formatAmount(Number(item.amount))}</ThemedText>
+      <ThemedText style={styles.rowAmount}>{format(Number(item.amount))}</ThemedText>
       <Pressable
         onPress={onRemove}
         accessibilityRole="button"

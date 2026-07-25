@@ -8,7 +8,6 @@ import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
-import { formatAmount } from '../../../lib/format';
 import {
   biggestExpense,
   categoryBreakdown,
@@ -19,6 +18,7 @@ import {
   previousMonthKey,
 } from '../../../lib/stats';
 import { useCategories } from '../../../hooks/useCategories';
+import { useCurrency } from '../../../hooks/useCurrency';
 import { useListItems } from '../../../hooks/useListItems';
 import { useShoppingList } from '../../../hooks/useShoppingList';
 import { useTransactions } from '../../../hooks/useTransactions';
@@ -27,6 +27,7 @@ import { useTranslation } from '../../../hooks/useTranslation';
 export default function StatsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { format } = useCurrency();
   const { items, loading } = useTransactions();
   const { categories } = useCategories();
   const { listId } = useShoppingList();
@@ -85,7 +86,7 @@ export default function StatsScreen() {
                 <ThemedText type="smallBold" themeColor="textSecondary" style={styles.heroLabel}>
                   {t('stats.spentThisMonth')}
                 </ThemedText>
-                <ThemedText style={styles.heroValue}>{formatAmount(totals.total)}</ThemedText>
+                <ThemedText style={styles.heroValue}>{format(totals.total)}</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
                   {deltaLabel}
                 </ThemedText>
@@ -99,9 +100,9 @@ export default function StatsScreen() {
               <ThemedView type="backgroundElement" style={styles.factsCard}>
                 <Fact label={t('stats.expenses')} value={String(totals.count)} />
                 <View style={styles.factDivider} />
-                <Fact label={t('stats.avg')} value={formatAmount(avg)} />
+                <Fact label={t('stats.avg')} value={format(avg)} />
                 <View style={styles.factDivider} />
-                <Fact label={t('stats.biggest')} value={formatAmount(Number(biggest?.amount ?? 0))} />
+                <Fact label={t('stats.biggest')} value={format(Number(biggest?.amount ?? 0))} />
               </ThemedView>
 
               <ThemedView type="backgroundElement" style={styles.card}>
@@ -124,7 +125,7 @@ export default function StatsScreen() {
                           {name}
                         </ThemedText>
                         <ThemedText type="small" themeColor="textSecondary" style={styles.catAmount}>
-                          {formatAmount(slice.amount)}
+                          {format(slice.amount)}
                         </ThemedText>
                       </View>
                       <ProgressBar ratio={slice.share} color={color} />
@@ -152,12 +153,13 @@ export default function StatsScreen() {
 }
 
 function SplitCard({ label, value, tone }: { label: string; value: number; tone: 'ours' | 'mine' }) {
+  const { format } = useCurrency();
   return (
     <View style={[styles.splitCard, { backgroundColor: Accent[tone] }, Shadow.card]}>
       <ThemedText type="smallBold" style={styles.splitLabel}>
         {label.toUpperCase()}
       </ThemedText>
-      <ThemedText style={styles.splitValue}>{formatAmount(value)}</ThemedText>
+      <ThemedText style={styles.splitValue}>{format(value)}</ThemedText>
     </View>
   );
 }

@@ -18,7 +18,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatAmount } from '../../../lib/format';
 import {
   buildPayload,
   buildReviewLines,
@@ -26,6 +25,7 @@ import {
   type LineAction,
   type ReviewLine,
 } from '../../../lib/receipt';
+import { useCurrency } from '../../../hooks/useCurrency';
 import { useListItems } from '../../../hooks/useListItems';
 import { useReceiptScan } from '../../../hooks/useReceiptScan';
 import { useShoppingList } from '../../../hooks/useShoppingList';
@@ -35,6 +35,7 @@ type Phase = 'capture' | 'scanning' | 'review';
 
 export default function ReceiptScreen() {
   const router = useRouter();
+  const { format } = useCurrency();
   const { listId } = useShoppingList();
   const { items: listItems } = useListItems(listId);
   const { scan, apply, applying, error } = useReceiptScan();
@@ -191,7 +192,7 @@ export default function ReceiptScreen() {
                     TOTAL
                   </ThemedText>
                   <ThemedText type="subtitle" testID="receipt-total">
-                    {formatAmount(total)}
+                    {format(total)}
                   </ThemedText>
                 </View>
                 <Pressable

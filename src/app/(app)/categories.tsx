@@ -16,9 +16,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatAmount, parseAmount } from '../../../lib/format';
+import { parseAmount } from '../../../lib/format';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCategories, type Category, type CategoryScope } from '../../../hooks/useCategories';
+import { useCurrency } from '../../../hooks/useCurrency';
 import { useTranslation } from '../../../hooks/useTranslation';
 
 const CATEGORY_COLORS = [
@@ -246,6 +247,7 @@ function CategoryRow({
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const { format } = useCurrency();
   const [editingIcon, setEditingIcon] = useState(false);
   return (
     <ThemedView type="backgroundElement" style={styles.rowCard}>
@@ -279,7 +281,7 @@ function CategoryRow({
           />
         ) : category.monthly_limit != null ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {t('budget.limit', { amount: formatAmount(category.monthly_limit) })}
+            {t('budget.limit', { amount: format(category.monthly_limit) })}
           </ThemedText>
         ) : null}
         {canEdit && (
