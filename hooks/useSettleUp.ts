@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
@@ -51,6 +51,8 @@ export function useSettleUp(transactions: Transaction[]) {
   const [error, setError] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
   const [attempt, setAttempt] = useState(0); // bumped by retry()
+  // Unique channel topic per instance (see the note in useTransactions).
+  const channelIdRef = useRef(Math.random().toString(36).slice(2));
 
   // Initial load
   useEffect(() => {
@@ -81,7 +83,7 @@ export function useSettleUp(transactions: Transaction[]) {
   useEffect(() => {
     if (!householdId) return;
     const channel: RealtimeChannel = supabase
-      .channel(`settle:${householdId}`)
+      .channel(`settle:${householdId}:${channelIdRef.current}`)
       .on(
         'postgres_changes',
         {

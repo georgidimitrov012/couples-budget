@@ -149,17 +149,30 @@ export default function BudgetScreen() {
           style={styles.inner}>
           <View style={styles.headerRow}>
             <ThemedText type="subtitle">{t('budget.title')}</ThemedText>
-            <Link href="/categories" asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('budget.manageCategories')}
-                hitSlop={8}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedText type="smallBold" style={styles.link}>
-                  {t('budget.categories')}
-                </ThemedText>
-              </Pressable>
-            </Link>
+            <View style={styles.headerLinks}>
+              <Link href="/stats" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('stats.title')}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedText type="smallBold" style={styles.link}>
+                    {t('stats.title')}
+                  </ThemedText>
+                </Pressable>
+              </Link>
+              <Link href="/categories" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('budget.manageCategories')}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedText type="smallBold" style={styles.link}>
+                    {t('budget.categories')}
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            </View>
           </View>
 
           <ScrollView
@@ -694,6 +707,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.three,
   },
   link: { color: Accent.primary },
+  headerLinks: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   summaryRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.three },
   settleCard: {
     flexDirection: 'row',

@@ -45,6 +45,7 @@ function AppNavigator() {
         <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
         <Stack.Screen name="receipt" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="stats" options={{ presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

@@ -65,6 +65,10 @@ export function useTransactions() {
   const householdId = household?.id ?? null;
   const userIdRef = useRef<string | null>(user?.id ?? null);
   userIdRef.current = user?.id ?? null;
+  // Unique channel topic per instance so a second mount (e.g. the Stats modal
+  // over the Budget tab) doesn't collide with the first — Supabase throws if you
+  // .on() a channel after subscribe(). See supabase-realtime-channel note.
+  const channelIdRef = useRef(Math.random().toString(36).slice(2));
 
   const [items, setItems] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +105,7 @@ export function useTransactions() {
   useEffect(() => {
     if (!householdId) return;
     const channel: RealtimeChannel = supabase
-      .channel(`budget:${householdId}`)
+      .channel(`budget:${householdId}:${channelIdRef.current}`)
       .on(
         'postgres_changes',
         {

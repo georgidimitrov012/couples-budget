@@ -106,6 +106,19 @@ describe('useTransactions', () => {
     expect(result.current.items.map((t) => t.id)).toEqual(['t2', 't1']);
   });
 
+  it('uses a unique channel name per instance (Stats modal over the Budget tab)', async () => {
+    mockChannel.mockClear();
+    const a = await renderHook(() => useTransactions());
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    const b = await renderHook(() => useTransactions());
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    const names = mockChannel.mock.calls.map((c) => String(c[0]));
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    expect(names.every((n) => n.startsWith('budget:h1'))).toBe(true);
+    expect(new Set(names).size).toBe(names.length); // all distinct
+  });
+
   it('adds optimistically then reconciles to the inserted row', async () => {
     results.insert = { data: tx({ id: 'real1', description: 'Coffee', amount: 5 }), error: null };
     const { result } = await renderHook(() => useTransactions());

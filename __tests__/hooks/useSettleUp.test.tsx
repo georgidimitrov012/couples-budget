@@ -109,6 +109,16 @@ describe('useSettleUp', () => {
     expect(result.current.balance).toBe(0);
   });
 
+  it('uses a unique channel name per instance (no cross-mount collision)', async () => {
+    mockChannel.mockClear();
+    await renderSettle([]);
+    await renderSettle([]);
+    const names = mockChannel.mock.calls.map((c) => String(c[0]));
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    expect(names.every((n) => n.startsWith('settle:h1'))).toBe(true);
+    expect(new Set(names).size).toBe(names.length); // all distinct
+  });
+
   it('splits shared expenses 50/50: each partner owes half of what the other paid', async () => {
     const { result } = await renderSettle([
       tx({ owner_id: 'u1', amount: 100 }), // Maria owes me 50
