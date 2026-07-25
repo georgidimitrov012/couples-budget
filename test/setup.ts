@@ -22,3 +22,11 @@ jest.mock('expo-router', () => ({
   Link: ({ children }: { children?: React.ReactNode }) => children,
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
 }));
+
+// Sentry pulls in native modules; stub the JS API so crash-reporting code can be
+// imported and asserted on without touching the native SDK.
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  captureException: jest.fn(),
+  wrap: (component: unknown) => component,
+}));
