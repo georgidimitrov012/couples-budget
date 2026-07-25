@@ -24,12 +24,6 @@ jobs:
   verify:
     name: typecheck · tests · bundle
     runs-on: ubuntu-latest
-    env:
-      # Fake Supabase config so the client constructs and the bundle inlines
-      # non-empty values. CI never touches a real project — these are throwaway
-      # placeholders, not secrets.
-      EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,4 +55,12 @@ jobs:
         run: pnpm test
 
       - name: Production bundle smoke test
+        # Fake Supabase config so the client's EXPO_PUBLIC_* reads inline to
+        # non-empty values in the bundle. Scoped to this step only — setting it
+        # job-wide would inline it during the Jest transform too and defeat
+        # supabase-config.test.ts's "throws when missing" case. Throwaway
+        # placeholders, not secrets; CI never touches a real project.
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
         run: pnpm expo export --platform android
