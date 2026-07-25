@@ -3,10 +3,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider, useAuth } from '../../hooks/useAuth';
 import { TranslationProvider } from '../../hooks/useTranslation';
+import { initCrashReporting } from '../../lib/crash-reporting';
 
 SplashScreen.preventAutoHideAsync();
+initCrashReporting();
 
 function RootNavigator() {
   const { session, initializing } = useAuth();
@@ -32,12 +35,14 @@ export default function RootLayout() {
 
   return (
     <TranslationProvider>
-      <AuthProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <AnimatedSplashOverlay />
-          <RootNavigator />
-        </ThemeProvider>
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <AnimatedSplashOverlay />
+            <RootNavigator />
+          </ThemeProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </TranslationProvider>
   );
 }
