@@ -8,7 +8,6 @@ import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { formatAmount } from '../../../lib/format';
 import {
   biggestExpense,

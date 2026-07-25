@@ -34,11 +34,10 @@ type Image = { base64: string; uri: string; mimeType?: string };
 type Phase = 'capture' | 'scanning' | 'review';
 
 export default function ReceiptScreen() {
-  const theme = useTheme();
   const router = useRouter();
   const { listId } = useShoppingList();
   const { items: listItems } = useListItems(listId);
-  const { scan, apply, scanning, applying, error } = useReceiptScan();
+  const { scan, apply, applying, error } = useReceiptScan();
 
   const [phase, setPhase] = useState<Phase>('capture');
   const [image, setImage] = useState<Image | null>(null);
