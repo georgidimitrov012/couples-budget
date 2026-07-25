@@ -7,9 +7,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { CURRENCIES, CURRENCY_LABEL, CURRENCY_SYMBOL } from '../../../lib/currency';
 import { LANG_LABEL, LANGS } from '../../../lib/i18n';
 import { useAccount } from '../../../hooks/useAccount';
 import { useAuth } from '../../../hooks/useAuth';
+import { useCurrency } from '../../../hooks/useCurrency';
 import { useHousehold } from '../../../hooks/useHousehold';
 import { useTranslation } from '../../../hooks/useTranslation';
 
@@ -17,6 +19,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { t, lang, setLang } = useTranslation();
+  const { currency, setCurrency } = useCurrency();
   const { user } = useAuth();
   const { household, members, leaveHousehold } = useHousehold();
   const { deleteAccount } = useAccount();
@@ -123,6 +126,36 @@ export default function SettingsScreen() {
                       style={active ? styles.langActive : undefined}
                       themeColor={active ? 'text' : 'textSecondary'}>
                       {LANG_LABEL[l]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={styles.card}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              {t('settings.currency')}
+            </ThemedText>
+            <View style={styles.langRow}>
+              {CURRENCIES.map((c) => {
+                const active = currency === c;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setCurrency(c)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={CURRENCY_LABEL[c]}
+                    style={[
+                      styles.langOption,
+                      { borderColor: active ? Accent.primary : theme.backgroundSelected },
+                      active && { backgroundColor: theme.tint },
+                    ]}>
+                    <ThemedText
+                      style={active ? styles.langActive : undefined}
+                      themeColor={active ? 'text' : 'textSecondary'}>
+                      {CURRENCY_SYMBOL[c]}
                     </ThemedText>
                   </Pressable>
                 );

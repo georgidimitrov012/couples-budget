@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { AuthProvider, useAuth } from '../../hooks/useAuth';
+import { CurrencyProvider } from '../../hooks/useCurrency';
 import { TranslationProvider } from '../../hooks/useTranslation';
 import { initCrashReporting } from '../../lib/crash-reporting';
 
@@ -36,12 +37,14 @@ export default function RootLayout() {
   return (
     <TranslationProvider>
       <ErrorBoundary>
-        <AuthProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AnimatedSplashOverlay />
-            <RootNavigator />
-          </ThemeProvider>
-        </AuthProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AnimatedSplashOverlay />
+              <RootNavigator />
+            </ThemeProvider>
+          </AuthProvider>
+        </CurrencyProvider>
       </ErrorBoundary>
     </TranslationProvider>
   );

@@ -49,6 +49,13 @@ describe('SettingsScreen', () => {
     expect(screen.getByLabelText('English')).toBeTruthy();
   });
 
+  it('offers the currency options', async () => {
+    await render(<SettingsScreen />);
+    expect(screen.getByLabelText('Euro')).toBeTruthy();
+    expect(screen.getByLabelText('Lev')).toBeTruthy();
+    expect(screen.getByLabelText('Dollar')).toBeTruthy();
+  });
+
   it('leaves the household after confirming', async () => {
     autoConfirm();
     const user = userEvent.setup();
