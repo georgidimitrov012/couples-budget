@@ -16,7 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { parseAmount } from '../../../lib/format';
+import { formatAmount, parseAmount } from '../../../lib/format';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCategories, type Category, type CategoryScope } from '../../../hooks/useCategories';
 import { useTranslation } from '../../../hooks/useTranslation';
@@ -279,7 +279,7 @@ function CategoryRow({
           />
         ) : category.monthly_limit != null ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {t('budget.limit', { amount: category.monthly_limit })}
+            {t('budget.limit', { amount: formatAmount(category.monthly_limit) })}
           </ThemedText>
         ) : null}
         {canEdit && (

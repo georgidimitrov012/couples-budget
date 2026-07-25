@@ -72,7 +72,7 @@ describe('ReceiptScreen', () => {
     expect(screen.getByDisplayValue('Dish soap')).toBeTruthy();
     // Matched item defaults to "Check: Milk"; total sums both lines.
     expect(screen.getByLabelText(/Check: Milk/)).toBeTruthy();
-    expect(screen.getByTestId('receipt-total').props.children).toBe('6.50');
+    expect(screen.getByTestId('receipt-total').props.children).toBe('6.50 €');
   });
 
   it('submits the reviewed lines via apply()', async () => {
@@ -100,7 +100,7 @@ describe('ReceiptScreen', () => {
     // Skip the Dish soap line (the second "Skip" chip).
     const skips = screen.getAllByLabelText(/^Skip/);
     await user.press(skips[1]);
-    expect(screen.getByTestId('receipt-total').props.children).toBe('2.50');
+    expect(screen.getByTestId('receipt-total').props.children).toBe('2.50 €');
 
     await user.press(screen.getByLabelText('Submit receipt'));
     await waitFor(() => expect(mockApply).toHaveBeenCalled());

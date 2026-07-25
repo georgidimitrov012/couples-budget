@@ -149,8 +149,8 @@ describe('BudgetScreen', () => {
       ],
     });
     await render(<BudgetScreen />);
-    expect(screen.getByTestId('summary-ours').props.children).toBe('20.00');
-    expect(screen.getByTestId('summary-mine').props.children).toBe('5.50');
+    expect(screen.getByTestId('summary-ours').props.children).toBe('20.00 €');
+    expect(screen.getByTestId('summary-mine').props.children).toBe('5.50 €');
   });
 
   it('adds a shared expense from the form', async () => {
@@ -232,7 +232,7 @@ describe('BudgetScreen', () => {
     mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 50 }] });
     await render(<BudgetScreen />);
     expect(screen.getByTestId('category-budgets')).toBeTruthy();
-    expect(screen.getByText('20.00 / 50.00')).toBeTruthy();
+    expect(screen.getByText('20.00 € / 50.00 €')).toBeTruthy();
   });
 
   it('shows an over-limit category budget', async () => {
@@ -242,7 +242,7 @@ describe('BudgetScreen', () => {
     });
     mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 10 }] });
     await render(<BudgetScreen />);
-    expect(screen.getByText('20.00 / 10.00')).toBeTruthy();
+    expect(screen.getByText('20.00 € / 10.00 €')).toBeTruthy();
   });
 
   it('hides the budgets section when no category has a limit', async () => {
@@ -271,7 +271,7 @@ describe('BudgetScreen', () => {
     mockUseHousehold.mockReturnValue(COUPLE);
     mockUseSettleUp.mockReturnValue({ ...settleBase, balance: 12 });
     await render(<BudgetScreen />);
-    expect(screen.getByText('Maria owes you 12.00')).toBeTruthy();
+    expect(screen.getByText('Maria owes you 12.00 €')).toBeTruthy();
     expect(screen.getByLabelText('Mark as settled')).toBeTruthy();
   });
 
@@ -279,7 +279,7 @@ describe('BudgetScreen', () => {
     mockUseHousehold.mockReturnValue(COUPLE);
     mockUseSettleUp.mockReturnValue({ ...settleBase, balance: -7.5 });
     await render(<BudgetScreen />);
-    expect(screen.getByText('You owe Maria 7.50')).toBeTruthy();
+    expect(screen.getByText('You owe Maria 7.50 €')).toBeTruthy();
   });
 
   it('shows all-square (no settle button) with the last settle date', async () => {

@@ -141,7 +141,7 @@ describe('CategoriesScreen', () => {
       categories: [cat({ id: 'c2', name: 'Rent', owner_id: 'u2', monthly_limit: 120 })],
     });
     await render(<CategoriesScreen />);
-    expect(screen.getByText('Limit 120')).toBeTruthy();
+    expect(screen.getByText('Limit 120.00 €')).toBeTruthy();
     expect(screen.queryByLabelText('Monthly limit for Rent')).toBeNull();
   });
 
