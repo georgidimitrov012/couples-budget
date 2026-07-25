@@ -48,6 +48,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Expo type declarations
+        # expo-env.d.ts supplies the ambient CSS-module types (via expo/types) and
+        # is gitignored — Expo only writes it locally on `expo start`, so recreate
+        # it here or tsc can't resolve global.css / *.module.css imports.
+        run: printf '/// <reference types="expo/types" />\n' > expo-env.d.ts
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
