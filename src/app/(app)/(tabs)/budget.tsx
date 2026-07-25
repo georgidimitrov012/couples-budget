@@ -163,6 +163,7 @@ export default function BudgetScreen() {
           </View>
 
           <ScrollView
+            style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
@@ -680,8 +681,11 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.three,
   },
+  // The ScrollView must flex to fill the column, or it collapses to content
+  // height and leaves dead space above the tab bar. Tab clearance lives on the
+  // content padding so the list can scroll fully clear of the native tab bar.
+  scroll: { flex: 1 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -801,7 +805,7 @@ const styles = StyleSheet.create({
   checkboxSmChecked: { backgroundColor: Accent.primary, borderColor: Accent.primary },
   checkmarkSm: { color: Accent.onPrimary, fontSize: 12, fontWeight: '700', lineHeight: 14 },
   flexShrink: { flexShrink: 1 },
-  scrollContent: { paddingBottom: Spacing.four },
+  scrollContent: { paddingBottom: BottomTabInset + Spacing.four },
   addButton: {
     backgroundColor: Accent.primary,
     borderRadius: Spacing.two,
