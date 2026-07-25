@@ -60,7 +60,7 @@ describe('StatsScreen', () => {
     mockUseCategories.mockReturnValue({ categories: [FOOD] });
     await render(<StatsScreen />);
 
-    expect(screen.getByText('40.00')).toBeTruthy(); // month total
+    expect(screen.getByText('40.00 €')).toBeTruthy(); // month total
     expect(screen.getByText('Food')).toBeTruthy(); // category breakdown
     expect(screen.getByText('Uncategorized')).toBeTruthy(); // the null-category bucket
   });
