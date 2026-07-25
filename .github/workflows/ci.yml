@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   verify:
-    name: typecheck · tests · bundle
+    name: lint · typecheck · tests · bundle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,6 +47,9 @@ jobs:
         # is gitignored — Expo only writes it locally on `expo start`, so recreate
         # it here or tsc can't resolve global.css / *.module.css imports.
         run: printf '/// <reference types="expo/types" />\n' > expo-env.d.ts
+
+      - name: Lint
+        run: pnpm lint
 
       - name: Typecheck
         run: pnpm exec tsc --noEmit

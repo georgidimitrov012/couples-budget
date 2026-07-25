@@ -77,6 +77,11 @@ with a 6-character invite code.
   never in app code); without it, it runs in anon-fallback mode and leaves test data.
 - Test dirs are excluded from the app `tsconfig` (Jest transpiles them via Babel).
 - **CI** (`.github/workflows/ci.yml`) runs on every PR into `main` and push to `main`:
-  `tsc --noEmit`, `pnpm test`, and a production `expo export` bundle smoke test — the
-  deterministic, no-network checks. The live `pnpm test:security` suite is **not** in CI
+  `pnpm lint`, `tsc --noEmit`, `pnpm test`, and a production `expo export` bundle smoke test
+  — the deterministic, no-network checks. The live `pnpm test:security` suite is **not** in CI
   (it needs the real project + service-role key); keep running it locally before merge.
+- **Lint** is ESLint 9 (flat config, `eslint-config-expo`; run `pnpm lint`). The new React
+  Compiler hook rules (`react-hooks/refs|purity|set-state-in-effect`) are set to **warn**, not
+  error — they flag intentional patterns (the per-instance realtime channel id; prop→state sync
+  effects). Only errors fail CI. Don't "fix" a warning in a realtime hook without reading
+  the channel-uniqueness note first.
