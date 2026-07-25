@@ -3,8 +3,10 @@ import {
   categoryBreakdown,
   deltaFraction,
   monthKeyOf,
+  monthlyTotalsSeries,
   monthTotal,
   monthTotals,
+  nextMonthKey,
   previousMonthKey,
 } from '../../lib/stats';
 
@@ -27,6 +29,32 @@ describe('month keys', () => {
   it('previousMonthKey rolls back over year boundaries', () => {
     expect(previousMonthKey('2026-07')).toBe('2026-06');
     expect(previousMonthKey('2026-01')).toBe('2025-12');
+  });
+
+  it('nextMonthKey rolls forward over year boundaries', () => {
+    expect(nextMonthKey('2026-07')).toBe('2026-08');
+    expect(nextMonthKey('2026-12')).toBe('2027-01');
+  });
+});
+
+describe('monthlyTotalsSeries', () => {
+  it('returns totals for N consecutive months ending at the given month, oldest first', () => {
+    const txs = [
+      tx({ amount: 10, occurred_on: '2026-07-15' }),
+      tx({ amount: 5, occurred_on: '2026-07-20' }),
+      tx({ amount: 7, occurred_on: '2026-05-01' }),
+    ];
+    const series = monthlyTotalsSeries(txs, '2026-07', 3);
+    expect(series).toEqual([
+      { monthKey: '2026-05', total: 7 },
+      { monthKey: '2026-06', total: 0 },
+      { monthKey: '2026-07', total: 15 },
+    ]);
+  });
+
+  it('spans year boundaries', () => {
+    const series = monthlyTotalsSeries([], '2026-01', 3);
+    expect(series.map((p) => p.monthKey)).toEqual(['2025-11', '2025-12', '2026-01']);
   });
 });
 
