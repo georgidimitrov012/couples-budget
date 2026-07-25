@@ -21,6 +21,13 @@ export function previousMonthKey(monthKey: string): string {
   return monthKeyOf(new Date(year, month - 2, 1));
 }
 
+/** The 'YYYY-MM' one month after the given key (handles year rollover). */
+export function nextMonthKey(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  // `month` is 1-based, so it's already the next month's 0-based index.
+  return monthKeyOf(new Date(year, month, 1));
+}
+
 export type MonthTotals = { ours: number; mine: number; total: number; count: number };
 
 /** Ours (shared) / Mine (private) / total spend and expense count for a month. */
@@ -81,4 +88,24 @@ export function biggestExpense<T extends TxLike>(txs: T[], monthKey: string): T 
 export function deltaFraction(current: number, previous: number): number | null {
   if (!(previous > 0)) return null;
   return (current - previous) / previous;
+}
+
+export type MonthPoint = { monthKey: string; total: number };
+
+/**
+ * Totals for `count` consecutive months ending at `endMonthKey` (oldest first) —
+ * the series behind the stats trend chart.
+ */
+export function monthlyTotalsSeries(
+  txs: TxLike[],
+  endMonthKey: string,
+  count: number
+): MonthPoint[] {
+  const keys: string[] = [];
+  let key = endMonthKey;
+  for (let i = 0; i < count; i++) {
+    keys.unshift(key);
+    key = previousMonthKey(key);
+  }
+  return keys.map((monthKey) => ({ monthKey, total: monthTotal(txs, monthKey) }));
 }
