@@ -76,3 +76,7 @@ with a 6-character invite code.
 - The security suite self-cleans when `SUPABASE_SERVICE_ROLE_KEY` is in `.env` (test-only,
   never in app code); without it, it runs in anon-fallback mode and leaves test data.
 - Test dirs are excluded from the app `tsconfig` (Jest transpiles them via Babel).
+- **CI** (`.github/workflows/ci.yml`) runs on every PR into `main` and push to `main`:
+  `tsc --noEmit`, `pnpm test`, and a production `expo export` bundle smoke test — the
+  deterministic, no-network checks. The live `pnpm test:security` suite is **not** in CI
+  (it needs the real project + service-role key); keep running it locally before merge.

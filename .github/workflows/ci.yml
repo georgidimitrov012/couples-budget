@@ -1,0 +1,66 @@
+name: CI
+
+# Runs on every PR into main and on pushes to main. Keeps the deterministic,
+# no-network checks green before merge: TypeScript, the Jest unit/component
+# suite, and a production Metro/Hermes bundle smoke test (which catches the
+# module-resolution / bundling breaks that have caused launch crashes before).
+#
+# The live RLS/penetration suite (`pnpm test:security`) is intentionally NOT run
+# here: it hits a real Supabase project and needs the service-role key, so it
+# stays a manual pre-merge gate (see AGENTS.md).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A newer commit on the same branch cancels the in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · tests · bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Expo type declarations
+        # expo-env.d.ts supplies the ambient CSS-module types (via expo/types) and
+        # is gitignored — Expo only writes it locally on `expo start`, so recreate
+        # it here or tsc can't resolve global.css / *.module.css imports.
+        run: printf '/// <reference types="expo/types" />\n' > expo-env.d.ts
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Unit & component tests
+        run: pnpm test
+
+      - name: Production bundle smoke test
+        # Fake Supabase config so the client's EXPO_PUBLIC_* reads inline to
+        # non-empty values in the bundle. Scoped to this step only — setting it
+        # job-wide would inline it during the Jest transform too and defeat
+        # supabase-config.test.ts's "throws when missing" case. Throwaway
+        # placeholders, not secrets; CI never touches a real project.
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: pnpm expo export --platform android
