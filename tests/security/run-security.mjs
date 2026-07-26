@@ -290,6 +290,22 @@ async function main() {
   const cRegen = await clientC.rpc('regenerate_invite_code');
   check('outsider (C) cannot regenerate a code', cRegen.error != null, cRegen.error?.message ?? 'NO ERROR');
 
+  // --- DB check constraints (server-side backstop, not just client UI) ----
+  const badAmount = await clientA
+    .from('transactions')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 0, description: 'zero', scope: 'shared' });
+  check('DB rejects a transaction with amount <= 0', badAmount.error != null, badAmount.error?.message ?? 'NO ERROR');
+
+  const badQty = await clientA
+    .from('list_items')
+    .insert({ list_id: list.id, name: 'zero qty', quantity: 0, added_by: a.id });
+  check('DB rejects a list item with quantity <= 0', badQty.error != null, badQty.error?.message ?? 'NO ERROR');
+
+  const badLimit = await clientA
+    .from('categories')
+    .insert({ household_id: hh.id, owner_id: a.id, name: 'neg limit', scope: 'shared', monthly_limit: -5 });
+  check('DB rejects a category with a negative monthly limit', badLimit.error != null, badLimit.error?.message ?? 'NO ERROR');
+
   // --- leave-household / account deletion --------------------------------
   // These are destructive, so they run last against their own fresh households.
 

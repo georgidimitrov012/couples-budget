@@ -311,8 +311,29 @@ format + regeneration checks should pass.
 
 ---
 
-> §9 (DB check constraints — `amount > 0`, `quantity > 0`, `monthly_limit >= 0`) is built
-> but parked on branch `feat/db-check-constraints`; apply it from there if/when that merges.
+## 9. Migration: DB check constraints
+
+Adds server-side `CHECK` constraints so invalid amounts/quantities are rejected by the
+database, not just by the client UI (a defensive backstop, mirroring the existing
+`settlements.amount > 0` check). Fresh projects get these inline from `schema.sql`; existing
+projects apply them once in the SQL Editor:
+
+```sql
+alter table public.transactions
+  add constraint transactions_amount_check check (amount > 0);
+alter table public.list_items
+  add constraint list_items_quantity_check check (quantity > 0);
+alter table public.categories
+  add constraint categories_monthly_limit_check
+  check (monthly_limit is null or monthly_limit >= 0);
+```
+
+Safe to run: a probe of the live DB confirmed **0 existing rows violate any of these**, so
+each `add constraint` validates instantly without rejecting current data. (If a future run
+ever errors with "check constraint … is violated by some row", find the offending rows first
+with e.g. `select * from public.transactions where amount <= 0;`.)
+
+**Smoke-test:** run `pnpm test:security` — the three "DB rejects …" checks should pass.
 
 ---
 
