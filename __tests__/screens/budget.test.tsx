@@ -36,9 +36,15 @@ const FOOD = {
 
 // A date in the current month so it lands in the "this month" totals.
 function thisMonthDate(day = 15): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return monthDate(0, day);
 }
+// A date `offset` months from now (0 = this month, -1 = last month).
+function monthDate(offset: number, day = 15): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + offset, day);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+const NBSP = String.fromCharCode(0xa0);
 
 type Tx = {
   id: string;
@@ -394,5 +400,42 @@ describe('BudgetScreen', () => {
 
     expect(addTransaction).toHaveBeenCalled();
     expect(addItem).not.toHaveBeenCalled();
+  });
+
+  it('navigates to a previous month and scopes totals + list to it', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [
+        tx({ id: 'now', scope: 'shared', amount: 20, description: 'ThisMonthBuy', occurred_on: monthDate(0) }),
+        tx({ id: 'prev', scope: 'shared', amount: 8, description: 'LastMonthBuy', occurred_on: monthDate(-1) }),
+      ],
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    // Current month: only its total and transaction show.
+    expect(screen.getByTestId('summary-ours').props.children).toBe(`20.00${NBSP}€`);
+    expect(screen.getByText('ThisMonthBuy')).toBeTruthy();
+    expect(screen.queryByText('LastMonthBuy')).toBeNull();
+
+    await user.press(screen.getByLabelText('Previous month'));
+
+    // Previous month: totals and list follow the selection.
+    expect(screen.getByTestId('summary-ours').props.children).toBe(`8.00${NBSP}€`);
+    expect(screen.getByText('LastMonthBuy')).toBeTruthy();
+    expect(screen.queryByText('ThisMonthBuy')).toBeNull();
+  });
+
+  it('hides the add form on past months (expenses record to today)', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 'now', occurred_on: monthDate(0) })],
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    expect(screen.getByLabelText('Add expense')).toBeTruthy();
+    await user.press(screen.getByLabelText('Previous month'));
+    expect(screen.queryByLabelText('Add expense')).toBeNull();
   });
 });
