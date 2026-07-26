@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { CategoriesProvider } from '../../../hooks/useCategories';
 import { HouseholdProvider, useHousehold } from '../../../hooks/useHousehold';
+import { usePushRegistration } from '../../../hooks/usePushRegistration';
 import { useTranslation } from '../../../hooks/useTranslation';
 
 function AppNavigator() {
@@ -52,6 +53,7 @@ function AppNavigator() {
 }
 
 export default function AppLayout() {
+  usePushRegistration();
   return (
     <HouseholdProvider>
       <CategoriesProvider>
