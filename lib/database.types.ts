@@ -177,6 +177,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          locale: string | null
           push_token: string | null
         }
         Insert: {
@@ -184,6 +185,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
+          locale?: string | null
           push_token?: string | null
         }
         Update: {
@@ -191,6 +193,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          locale?: string | null
           push_token?: string | null
         }
         Relationships: []

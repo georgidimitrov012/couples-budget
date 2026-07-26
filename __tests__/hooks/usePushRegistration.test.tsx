@@ -41,24 +41,24 @@ beforeEach(() => {
 
 describe('registerPushToken', () => {
   it('saves the token to the profile when permission is already granted', async () => {
-    const token = await registerPushToken('u1');
+    const token = await registerPushToken('u1', 'bg');
     expect(token).toBe('ExponentPushToken[abc]');
     expect(mockFrom).toHaveBeenCalledWith('profiles');
-    expect(mockUpdate).toHaveBeenCalledWith({ push_token: 'ExponentPushToken[abc]' });
+    expect(mockUpdate).toHaveBeenCalledWith({ push_token: 'ExponentPushToken[abc]', locale: 'bg' });
     expect(mockEq).toHaveBeenCalledWith('id', 'u1');
   });
 
   it('requests permission when undetermined, then saves', async () => {
     mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
     mockRequestPermissions.mockResolvedValue({ granted: true, canAskAgain: false });
-    const token = await registerPushToken('u1');
+    const token = await registerPushToken('u1', 'bg');
     expect(mockRequestPermissions).toHaveBeenCalled();
     expect(token).toBe('ExponentPushToken[abc]');
   });
 
   it('does nothing when permission is denied (and does not nag)', async () => {
     mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: false });
-    const token = await registerPushToken('u1');
+    const token = await registerPushToken('u1', 'bg');
     expect(token).toBeNull();
     expect(mockRequestPermissions).not.toHaveBeenCalled();
     expect(mockFrom).not.toHaveBeenCalled();
@@ -66,13 +66,13 @@ describe('registerPushToken', () => {
 
   it('is a no-op on a simulator (no physical device)', async () => {
     mockIsDevice = false;
-    const token = await registerPushToken('u1');
+    const token = await registerPushToken('u1', 'bg');
     expect(token).toBeNull();
     expect(mockGetPermissions).not.toHaveBeenCalled();
   });
 
   it('never throws — a token failure just leaves push off', async () => {
     mockGetToken.mockRejectedValue(new Error('network'));
-    await expect(registerPushToken('u1')).resolves.toBeNull();
+    await expect(registerPushToken('u1', 'bg')).resolves.toBeNull();
   });
 });
