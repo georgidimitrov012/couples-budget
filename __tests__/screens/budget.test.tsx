@@ -252,6 +252,38 @@ describe('BudgetScreen', () => {
     expect(screen.getByText('20.00 € / 10.00 €')).toBeTruthy();
   });
 
+  it('shows an over-budget alert banner when spending exceeds a limit', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 's1', scope: 'shared', amount: 20, category_id: 'c1' })],
+    });
+    mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 10 }] });
+    await render(<BudgetScreen />);
+    expect(screen.getByTestId('budget-alerts')).toBeTruthy();
+    expect(screen.getByText(/1 over budget/)).toBeTruthy();
+  });
+
+  it('shows a nearing-limit alert when spending crosses the threshold but is under the limit', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 's1', scope: 'shared', amount: 9.5, category_id: 'c1' })],
+    });
+    mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 10 }] });
+    await render(<BudgetScreen />);
+    expect(screen.getByText(/1 nearing limit/)).toBeTruthy();
+  });
+
+  it('shows no alert banner when spending is comfortably under every limit', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 's1', scope: 'shared', amount: 2, category_id: 'c1' })],
+    });
+    mockUseCategories.mockReturnValue({ categories: [{ ...FOOD, monthly_limit: 10 }] });
+    await render(<BudgetScreen />);
+    expect(screen.getByTestId('category-budgets')).toBeTruthy();
+    expect(screen.queryByTestId('budget-alerts')).toBeNull();
+  });
+
   it('hides the budgets section when no category has a limit', async () => {
     mockUseCategories.mockReturnValue({ categories: [FOOD] }); // monthly_limit null
     await render(<BudgetScreen />);
