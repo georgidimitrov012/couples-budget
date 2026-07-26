@@ -115,6 +115,7 @@ const en: Dict = {
   'budget.emptyTitle': 'No expenses yet',
   'budget.emptyHint':
     'Add what you spent above — mark it Ours to split it 50/50, or Mine to keep it private.',
+  'budget.noMonthExpenses': 'No expenses this month',
   'budget.categoryBudgets': 'CATEGORY BUDGETS · THIS MONTH',
   'budget.none': 'None',
   'budget.forListItem': '🛒  FOR A LIST ITEM',
@@ -379,6 +380,7 @@ const bg: Dict = {
   'budget.emptyTitle': 'Още няма разходи',
   'budget.emptyHint':
     'Добави какво си похарчил отгоре — отбележи го Общ, за да го разделите 50/50, или Личен, за да остане само твой.',
+  'budget.noMonthExpenses': 'Няма разходи този месец',
   'budget.categoryBudgets': 'БЮДЖЕТИ ПО КАТЕГОРИЯ · ТОЗИ МЕСЕЦ',
   'budget.none': 'Няма',
   'budget.forListItem': '🛒  ЗА ПРОДУКТ ОТ СПИСЪКА',

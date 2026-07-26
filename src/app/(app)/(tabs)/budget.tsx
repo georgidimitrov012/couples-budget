@@ -23,6 +23,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
 import { categorize } from '../../../../lib/groceries';
+import { monthLong } from '../../../../lib/month';
+import { monthKeyOf, nextMonthKey, previousMonthKey } from '../../../../lib/stats';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
 import { useCurrency } from '../../../../hooks/useCurrency';
@@ -37,14 +39,9 @@ import {
   type TransactionScope,
 } from '../../../../hooks/useTransactions';
 
-function currentMonthKey(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
 export default function BudgetScreen() {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { items, loading, error, addTransaction, removeTransaction, retry } = useTransactions();
   const { categories } = useCategories();
   const { user } = useAuth();
@@ -65,6 +62,10 @@ export default function BudgetScreen() {
   const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
   const [boughtQty, setBoughtQty] = useState(1);
   const [addToList, setAddToList] = useState(false);
+
+  const currentMonth = monthKeyOf(new Date());
+  const [monthKey, setMonthKey] = useState(currentMonth);
+  const isCurrentMonth = monthKey === currentMonth;
 
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -95,13 +96,12 @@ export default function BudgetScreen() {
     if (!description.trim()) setDescription(item.name);
   }
 
-  const monthKey = currentMonthKey();
-  const thisMonth = items.filter((t) => t.occurred_on.startsWith(monthKey));
+  const monthItems = items.filter((t) => t.occurred_on.startsWith(monthKey));
   // Every private row RLS returns is the caller's own, so "Mine" = private here.
-  const oursTotal = thisMonth
+  const oursTotal = monthItems
     .filter((t) => t.scope === 'shared')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const mineTotal = thisMonth
+  const mineTotal = monthItems
     .filter((t) => t.scope === 'private')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -110,6 +110,7 @@ export default function BudgetScreen() {
     () => categories.filter((c) => c.monthly_limit != null && c.monthly_limit > 0),
     [categories]
   );
+  const monthLabel = isCurrentMonth ? t('budget.thisMonth') : monthLong(monthKey, lang);
 
   async function handleAdd() {
     if (parsedAmount == null) return;
@@ -176,6 +177,30 @@ export default function BudgetScreen() {
             </View>
           </View>
 
+          <View style={styles.switcher}>
+            <Pressable
+              onPress={() => setMonthKey(previousMonthKey(monthKey))}
+              accessibilityRole="button"
+              accessibilityLabel={t('stats.prevMonth')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedText style={styles.switchArrow}>‹</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.switchLabel}>{monthLong(monthKey, lang)}</ThemedText>
+            <Pressable
+              onPress={() => setMonthKey(nextMonthKey(monthKey))}
+              disabled={isCurrentMonth}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isCurrentMonth }}
+              accessibilityLabel={t('stats.nextMonth')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedText style={[styles.switchArrow, isCurrentMonth && styles.switchArrowOff]}>
+                ›
+              </ThemedText>
+            </Pressable>
+          </View>
+
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -184,19 +209,19 @@ export default function BudgetScreen() {
             <View style={styles.summaryRow}>
               <SummaryCard
                 label={t('scope.ours')}
-                sublabel={t('budget.thisMonth')}
+                sublabel={monthLabel}
                 value={oursTotal}
                 tone="ours"
               />
               <SummaryCard
                 label={t('scope.mine')}
-                sublabel={t('budget.thisMonth')}
+                sublabel={monthLabel}
                 value={mineTotal}
                 tone="mine"
               />
             </View>
 
-            {partner && (
+            {isCurrentMonth && partner && (
               <SettleCard
                 partnerName={partner.display_name ?? t('settle.yourPartner')}
                 myName={myName}
@@ -212,7 +237,8 @@ export default function BudgetScreen() {
               <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
             )}
 
-            <ThemedView type="backgroundElement" style={styles.addCard}>
+            {isCurrentMonth && (
+              <ThemedView type="backgroundElement" style={styles.addCard}>
               <View style={styles.amountRow}>
                 <TextInput
                   style={[styles.amountInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -282,7 +308,8 @@ export default function BudgetScreen() {
                 style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
                 <ThemedText style={styles.addButtonText}>{t('budget.addExpense')}</ThemedText>
               </Pressable>
-            </ThemedView>
+              </ThemedView>
+            )}
 
             {error && (
               <Pressable
@@ -308,9 +335,11 @@ export default function BudgetScreen() {
                 title={t('budget.emptyTitle')}
                 hint={t('budget.emptyHint')}
               />
+            ) : monthItems.length === 0 ? (
+              <EmptyState emoji="🗓️" title={t('budget.noMonthExpenses')} />
             ) : (
               <View style={styles.listContent}>
-                {items.map((item) => (
+                {monthItems.map((item) => (
                   <TransactionRow
                     key={item.id}
                     item={item}
@@ -713,6 +742,15 @@ const styles = StyleSheet.create({
   },
   link: { color: Accent.primary },
   headerLinks: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
+  switcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.two,
+  },
+  switchArrow: { fontSize: 26, fontWeight: '700', color: Accent.primary, lineHeight: 30 },
+  switchArrowOff: { opacity: 0.3 },
+  switchLabel: { fontSize: 17, fontWeight: '700' },
   summaryRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.three },
   settleCard: {
     flexDirection: 'row',
