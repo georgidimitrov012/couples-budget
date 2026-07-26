@@ -192,8 +192,50 @@ export function useTransactions() {
     }
   }, []);
 
+  // Edit an existing transaction (owner-only per RLS). Optimistic, rolled back on
+  // error; the date isn't editable so the row stays in its month.
+  const updateTransaction = useCallback(
+    async (
+      tx: Transaction,
+      changes: {
+        amount?: number;
+        description?: string;
+        scope?: TransactionScope;
+        categoryId?: string | null;
+      }
+    ) => {
+      const uid = userIdRef.current;
+      const updated: Transaction = {
+        ...tx,
+        amount: changes.amount ?? tx.amount,
+        description:
+          changes.description !== undefined ? changes.description.trim() || null : tx.description,
+        scope: changes.scope ?? tx.scope,
+        category_id: changes.categoryId !== undefined ? changes.categoryId : tx.category_id,
+      };
+      if (!Number.isFinite(updated.amount) || updated.amount <= 0) return;
+      setItems((prev) => upsert(prev, updated, uid));
+
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          amount: updated.amount,
+          description: updated.description,
+          scope: updated.scope,
+          category_id: updated.category_id,
+        })
+        .eq('id', tx.id);
+
+      if (error) {
+        setItems((prev) => upsert(prev, tx, uid)); // roll back to the original row
+        setError(error.message);
+      }
+    },
+    []
+  );
+
   // Re-runs the initial load, which also clears a stuck error (load or mutation).
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { items, loading, error, addTransaction, removeTransaction, retry };
+  return { items, loading, error, addTransaction, removeTransaction, updateTransaction, retry };
 }

@@ -78,6 +78,7 @@ const base = {
   error: null as string | null,
   addTransaction: jest.fn(),
   removeTransaction: jest.fn(),
+  updateTransaction: jest.fn(),
   retry: jest.fn(),
 };
 
@@ -424,6 +425,40 @@ describe('BudgetScreen', () => {
     expect(screen.getByTestId('summary-ours').props.children).toBe(`8.00${NBSP}€`);
     expect(screen.getByText('LastMonthBuy')).toBeTruthy();
     expect(screen.queryByText('ThisMonthBuy')).toBeNull();
+  });
+
+  it('edits your own transaction from the row', async () => {
+    const updateTransaction = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 't1', owner_id: 'u1', amount: 10, description: 'Coffee', scope: 'shared' })],
+      updateTransaction,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.press(screen.getByLabelText('Edit Coffee'));
+    const amount = screen.getByPlaceholderText('0.00');
+    await user.clear(amount);
+    await user.type(amount, '15');
+    await user.press(screen.getByLabelText('Save'));
+
+    expect(updateTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 't1' }),
+      expect.objectContaining({ amount: 15, description: 'Coffee' })
+    );
+  });
+
+  it('does not offer edit on a partner-owned transaction (but still allows remove)', async () => {
+    mockUseHousehold.mockReturnValue(COUPLE);
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 't2', owner_id: 'u2', scope: 'shared', description: 'Partner buy' })],
+    });
+    await render(<BudgetScreen />);
+
+    expect(screen.queryByLabelText('Edit Partner buy')).toBeNull();
+    expect(screen.getByLabelText('Remove Partner buy')).toBeTruthy();
   });
 
   it('hides the add form on past months (expenses record to today)', async () => {
