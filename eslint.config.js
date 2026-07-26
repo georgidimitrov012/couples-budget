@@ -5,8 +5,9 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    // Build output and generated files aren't ours to lint.
-    ignores: ['dist/*', '.expo/*', 'expo-env.d.ts', 'lib/database.types.ts'],
+    // Build output, generated files, and the Deno Edge Functions (their own
+    // runtime/imports — not linted by the app's config) aren't ours to lint.
+    ignores: ['dist/*', '.expo/*', 'expo-env.d.ts', 'lib/database.types.ts', 'supabase/**'],
   },
   {
     // The React Compiler hook rules (new in eslint-config-expo 57) are stricter

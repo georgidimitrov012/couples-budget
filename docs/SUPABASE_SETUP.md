@@ -353,5 +353,68 @@ After applying, regenerate types with `pnpm gen:types` (the repo ships a hand-ad
 **Requires a rebuild:** `expo-notifications` is a native module, so the token registration
 only runs in a fresh dev/EAS build (not Expo Go for remote push). On first authenticated
 launch the app asks for notification permission and saves the token; check the row in
-`profiles`. The actual sending is wired up in a follow-up (Edge Function + webhooks for
+`profiles`. The actual sending is wired up in §12–§13 below (Edge Function + webhooks for
 list-add / item-checked / expense-added / partner-joined).
+
+---
+
+## 12. Migration: push locale — `profiles.locale`
+
+So notifications are sent in the *recipient's* language (the app language is device-local, not
+otherwise known server-side). Fresh projects get it inline from `schema.sql`; existing projects:
+
+```sql
+alter table public.profiles add column locale text;
+```
+
+Nullable, no data touched (null → Bulgarian). The client writes the current language alongside
+the push token on each authenticated launch (`registerPushToken`), so it stays in sync. After
+applying, `pnpm gen:types` (hand-added in `lib/database.types.ts` meanwhile).
+
+---
+
+## 13. Push notifications — Edge Function + Database Webhooks
+
+Sends the actual pushes. The `push-notify` function (`supabase/functions/push-notify/`) receives
+a Database Webhook, finds the *other* household member, and sends them a localized Expo push.
+
+### 13a. Deploy the function
+
+```bash
+supabase functions deploy push-notify
+```
+
+No secrets to set — it uses `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, which Edge Functions
+already have. It never verifies a user JWT (the caller is a trusted webhook), so deploy it with
+JWT verification off:
+
+```bash
+supabase functions deploy push-notify --no-verify-jwt
+```
+
+### 13b. Create the Database Webhooks (Dashboard → Database → Webhooks)
+
+Create **three** webhooks, all pointing to the function
+(`https://<project-ref>.supabase.co/functions/v1/push-notify`), method `POST`, with an
+`Authorization: Bearer <service-role-key>` header:
+
+| Name | Table | Events |
+| --- | --- | --- |
+| `push_list_items` | `list_items` | Insert, Update |
+| `push_transactions` | `transactions` | Insert |
+| `push_members` | `household_members` | Insert |
+
+The function itself decides what's worth a push: a new **unchecked** list item (add), an
+`is_checked` flip false→true (bought), a **shared** transaction (expense), a new member (join).
+It skips everything else and skips solo households and members with no push token.
+
+> Note: checking a *priced* list item both flips `is_checked` and inserts a shared transaction,
+> so the partner may get two related pushes (bought + expense). Acceptable for now.
+
+### 13c. Smoke-test (needs two devices / accounts on a dev or EAS build)
+
+1. Both partners sign in on a real build and grant notifications (rows in `profiles` have a
+   `push_token`).
+2. Background the app on device B. On device A: add a list item → device B gets
+   "*A added … to the list*". Repeat for check-off, a shared expense, and a fresh join.
+3. Tapping the notification opens the list or budget. Verify the language matches device B's.

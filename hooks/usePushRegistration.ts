@@ -5,9 +5,11 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+import type { Lang } from '../lib/i18n';
 import { notificationRoute } from '../lib/push';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { useTranslation } from './useTranslation';
 
 // The sender is always the partner (never yourself), so a notification is always
 // news worth surfacing even while the app is foregrounded.
@@ -25,7 +27,7 @@ Notifications.setNotificationHandler({
  * Best-effort and never throws: a denied permission, a simulator, or a write
  * failure just leaves push off. Returns the token when registered, else null.
  */
-export async function registerPushToken(userId: string): Promise<string | null> {
+export async function registerPushToken(userId: string, locale: Lang): Promise<string | null> {
   try {
     if (!Device.isDevice) return null; // simulators/emulators can't get a token
 
@@ -46,7 +48,8 @@ export async function registerPushToken(userId: string): Promise<string | null> 
     const { data: token } = await Notifications.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined
     );
-    await supabase.from('profiles').update({ push_token: token }).eq('id', userId);
+    // Save the token + current language so the send side can localize pushes.
+    await supabase.from('profiles').update({ push_token: token, locale }).eq('id', userId);
     return token;
   } catch {
     // Push is a nice-to-have; registration must never take the app down.
@@ -60,11 +63,12 @@ export async function registerPushToken(userId: string): Promise<string | null> 
  */
 export function usePushRegistration() {
   const { user } = useAuth();
+  const { lang } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
-    if (user?.id) registerPushToken(user.id);
-  }, [user?.id]);
+    if (user?.id) registerPushToken(user.id, lang);
+  }, [user?.id, lang]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {

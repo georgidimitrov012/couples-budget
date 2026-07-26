@@ -32,6 +32,7 @@ create table public.profiles (
   display_name text,
   avatar_url  text,
   push_token  text, -- Expo push token for this user's device (see docs/SUPABASE_SETUP.md §11)
+  locale      text, -- 'bg' | 'en' — app language, so push notifications are localized (§12)
   created_at  timestamptz not null default now()
 );
 
