@@ -31,6 +31,7 @@ create table public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url  text,
+  push_token  text, -- Expo push token for this user's device (see docs/SUPABASE_SETUP.md §11)
   created_at  timestamptz not null default now()
 );
 

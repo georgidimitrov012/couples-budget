@@ -44,7 +44,8 @@
           "cameraPermission": "Couples Budget uses the camera to scan a paper receipt into the budget."
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

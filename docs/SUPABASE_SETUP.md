@@ -332,3 +332,26 @@ back as "Other" until re-categorized). After applying, regenerate types with `pn
 
 **Smoke-test:** on the List tab, add "Bread" → it appears under a **🥖 Bakery** group; the
 price field is gone and items carry a quantity stepper.
+
+---
+
+## 11. Migration: push notifications — `profiles.push_token`
+
+Stores each user's Expo push token so the send side (a future Edge Function + Database
+Webhooks) can notify the *other* partner when they're offline. Fresh projects get it inline
+from `schema.sql`; existing projects apply it once in the SQL Editor:
+
+```sql
+alter table public.profiles add column push_token text;
+```
+
+Safe and instant: one nullable column, no data touched. The existing `profiles_update`
+policy (`id = auth.uid()`) already lets a user write their own token — no new RLS needed.
+After applying, regenerate types with `pnpm gen:types` (the repo ships a hand-added
+`push_token` in `lib/database.types.ts` in the meantime).
+
+**Requires a rebuild:** `expo-notifications` is a native module, so the token registration
+only runs in a fresh dev/EAS build (not Expo Go for remote push). On first authenticated
+launch the app asks for notification permission and saves the token; check the row in
+`profiles`. The actual sending is wired up in a follow-up (Edge Function + webhooks for
+list-add / item-checked / expense-added / partner-joined).
