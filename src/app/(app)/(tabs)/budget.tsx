@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
+import { budgetAlerts, budgetLevel, monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
 import { categorize } from '../../../../lib/groceries';
 import { monthLong } from '../../../../lib/month';
@@ -493,16 +493,35 @@ function CategoryBudgets({
 }) {
   const { t } = useTranslation();
   const { format } = useCurrency();
+  const alerts = useMemo(() => budgetAlerts(budgets, spendByCategory), [budgets, spendByCategory]);
+  const overCount = alerts.filter((a) => a.level === 'over').length;
+  const nearCount = alerts.length - overCount;
+  const alertColor = overCount > 0 ? Accent.danger : Accent.warning;
+  const alertText = [
+    overCount > 0 ? t('budget.overBudget', { count: overCount }) : null,
+    nearCount > 0 ? t('budget.nearingLimit', { count: nearCount }) : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
   return (
     <ThemedView type="backgroundElement" style={styles.budgetsCard} testID="category-budgets">
       <ThemedText type="smallBold" themeColor="textSecondary">
         {t('budget.categoryBudgets')}
       </ThemedText>
+      {alerts.length > 0 && (
+        <View style={styles.budgetAlert} testID="budget-alerts">
+          <ThemedText type="smallBold" style={{ color: alertColor }}>
+            {`⚠  ${alertText}`}
+          </ThemedText>
+        </View>
+      )}
       {budgets.map((c) => {
         const spent = spendByCategory.get(c.id) ?? 0;
         const limit = c.monthly_limit ?? 0;
         const ratio = progressRatio(spent, limit);
-        const over = ratio > 1;
+        const level = budgetLevel(ratio);
+        const stateColor =
+          level === 'over' ? Accent.danger : level === 'near' ? Accent.warning : c.color ?? Accent.primary;
         return (
           <View key={c.id} style={styles.budgetRow} testID={`budget-${c.id}`}>
             <View style={styles.budgetHead}>
@@ -511,12 +530,12 @@ function CategoryBudgets({
               <ThemedText
                 type="small"
                 themeColor="textSecondary"
-                style={[styles.budgetAmount, over && styles.overText]}
+                style={[styles.budgetAmount, level !== 'ok' && { color: stateColor }]}
                 testID={`budget-amount-${c.id}`}>
                 {format(spent)} / {format(limit)}
               </ThemedText>
             </View>
-            <ProgressBar ratio={ratio} color={over ? Accent.danger : c.color ?? Accent.primary} />
+            <ProgressBar ratio={ratio} color={stateColor} />
           </View>
         );
       })}
@@ -855,7 +874,7 @@ const styles = StyleSheet.create({
   budgetRow: { gap: Spacing.one },
   budgetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   budgetAmount: { marginLeft: 'auto', fontVariant: ['tabular-nums'] },
-  overText: { color: Accent.danger },
+  budgetAlert: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   summaryCard: {
     flex: 1,
     borderRadius: Radius.lg,
