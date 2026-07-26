@@ -104,7 +104,7 @@ create table public.categories (
   name          text not null,
   icon          text,
   color         text,
-  monthly_limit numeric(12,2),
+  monthly_limit numeric(12,2) check (monthly_limit is null or monthly_limit >= 0),
   scope         text not null default 'shared' check (scope in ('private','shared')),
   created_at    timestamptz not null default now()
 );
@@ -117,7 +117,7 @@ create table public.transactions (
   household_id uuid not null references public.households(id) on delete cascade,
   category_id  uuid references public.categories(id) on delete set null,
   owner_id     uuid not null references auth.users(id),
-  amount       numeric(12,2) not null,
+  amount       numeric(12,2) not null check (amount > 0),
   description  text,
   occurred_on  date not null default current_date,
   scope        text not null default 'shared' check (scope in ('private','shared')),
@@ -177,7 +177,7 @@ create table public.list_items (
   id          uuid primary key default gen_random_uuid(),
   list_id     uuid not null references public.shopping_lists(id) on delete cascade,
   name        text not null,
-  quantity    int not null default 1,
+  quantity    int not null default 1 check (quantity > 0),
   price       numeric(12,2),                                  -- legacy/unused: the list no longer tracks price
   category_id uuid references public.categories(id) on delete set null,
   category    text,                                           -- grocery aisle key (see lib/groceries.ts); groups the list
