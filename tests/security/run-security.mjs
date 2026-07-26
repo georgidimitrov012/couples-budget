@@ -306,6 +306,43 @@ async function main() {
     .insert({ household_id: hh.id, owner_id: a.id, name: 'neg limit', scope: 'shared', monthly_limit: -5 });
   check('DB rejects a category with a negative monthly limit', badLimit.error != null, badLimit.error?.message ?? 'NO ERROR');
 
+  // --- recurring_rules (rent / subscriptions) -----------------------------
+  const aRuleShared = await clientA
+    .from('recurring_rules')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 900, description: 'Rent', scope: 'shared', day_of_month: 1 })
+    .select('id')
+    .single();
+  check('member (A) can create a shared recurring rule', aRuleShared.error == null, aRuleShared.error?.message ?? 'ok');
+
+  const aRulePrivate = await clientA
+    .from('recurring_rules')
+    .insert({ household_id: hh.id, owner_id: a.id, amount: 50, description: 'Gym', scope: 'private', day_of_month: 5 });
+  check('member (A) can create a private recurring rule', aRulePrivate.error == null, aRulePrivate.error?.message ?? 'ok');
+
+  const bRules = await clientB.from('recurring_rules').select('id').eq('household_id', hh.id);
+  const bRuleIds = (bRules.data ?? []).map((r) => r.id);
+  check(
+    "partner (B) sees the shared recurring rule but not A's private one",
+    bRuleIds.length === 1 && bRuleIds[0] === aRuleShared.data?.id,
+    JSON.stringify(bRuleIds)
+  );
+
+  const cReadRules = await clientC.from('recurring_rules').select('id').eq('household_id', hh.id);
+  check('non-member (C) cannot read recurring rules', (cReadRules.data ?? []).length === 0, JSON.stringify(cReadRules.data));
+
+  const cInsertRule = await clientC
+    .from('recurring_rules')
+    .insert({ household_id: hh.id, owner_id: c.id, amount: 1, scope: 'shared', day_of_month: 1 });
+  check('non-member (C) cannot create a recurring rule', cInsertRule.error != null, cInsertRule.error?.message ?? 'NO ERROR');
+
+  const spoofRule = await clientA
+    .from('recurring_rules')
+    .insert({ household_id: hh.id, owner_id: b.id, amount: 1, scope: 'shared', day_of_month: 1 });
+  check('recurring owner spoofing is rejected (owner_id must equal auth.uid)', spoofRule.error != null, spoofRule.error?.message ?? 'NO ERROR');
+
+  const cronCall = await clientA.rpc('apply_due_recurring');
+  check('client cannot call apply_due_recurring (scheduled job only)', cronCall.error != null, cronCall.error?.message ?? 'NO ERROR');
+
   // --- leave-household / account deletion --------------------------------
   // These are destructive, so they run last against their own fresh households.
 

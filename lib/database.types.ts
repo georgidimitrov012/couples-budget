@@ -58,6 +58,53 @@ export type Database = {
           },
         ]
       }
+      recurring_rules: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          day_of_month: number
+          description: string | null
+          household_id: string
+          id: string
+          last_charged_month: string | null
+          owner_id: string
+          scope: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          description?: string | null
+          household_id: string
+          id?: string
+          last_charged_month?: string | null
+          owner_id: string
+          scope?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          description?: string | null
+          household_id?: string
+          id?: string
+          last_charged_month?: string | null
+          owner_id?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_rules_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_members: {
         Row: {
           household_id: string
