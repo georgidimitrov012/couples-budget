@@ -4,6 +4,7 @@ const mockFrom = jest.fn();
 const mockChannel = jest.fn();
 const mockRemoveChannel = jest.fn();
 const insertSpy = jest.fn();
+const updateSpy = jest.fn();
 
 jest.mock('../../lib/supabase', () => ({
   supabase: {
@@ -24,19 +25,25 @@ jest.mock('../../hooks/useHousehold', () => {
 import { localDateString, useTransactions } from '../../hooks/useTransactions';
 
 type Result = { data?: unknown; error: unknown };
-const results: { select: Result; insert: Result; delete: Result } = {
+const results: { select: Result; insert: Result; delete: Result; update: Result } = {
   select: { data: [], error: null },
   insert: { data: null, error: null },
   delete: { error: null },
+  update: { error: null },
 };
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
-  let op: 'select' | 'insert' | 'delete' = 'select';
+  let op: 'select' | 'insert' | 'delete' | 'update' = 'select';
   chain.select = jest.fn(() => chain);
   chain.insert = jest.fn((...a: unknown[]) => {
     insertSpy(...a);
     op = 'insert';
+    return chain;
+  });
+  chain.update = jest.fn((...a: unknown[]) => {
+    updateSpy(...a);
+    op = 'update';
     return chain;
   });
   chain.delete = jest.fn(() => {
@@ -47,7 +54,9 @@ function makeChain() {
   chain.order = jest.fn(() => chain);
   chain.single = jest.fn(() => Promise.resolve(results.insert));
   chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-    Promise.resolve(op === 'delete' ? results.delete : results.select).then(res, rej);
+    Promise.resolve(
+      op === 'delete' ? results.delete : op === 'update' ? results.update : results.select
+    ).then(res, rej);
   return chain;
 }
 
@@ -72,7 +81,9 @@ beforeEach(() => {
   results.select = { data: [], error: null };
   results.insert = { data: null, error: null };
   results.delete = { error: null };
+  results.update = { error: null };
   insertSpy.mockClear();
+  updateSpy.mockClear();
   mockFrom.mockImplementation(() => makeChain());
   mockChannel.mockImplementation(() => {
     const ch: Record<string, unknown> = {};
@@ -163,6 +174,44 @@ describe('useTransactions', () => {
       await result.current.removeTransaction(result.current.items[0]);
     });
     expect(result.current.items).toHaveLength(0);
+  });
+
+  it('updates a transaction optimistically and writes the changes', async () => {
+    results.select = {
+      data: [tx({ id: 't1', amount: 10, description: 'Old', scope: 'shared', category_id: null })],
+      error: null,
+    };
+    const { result } = await renderHook(() => useTransactions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateTransaction(result.current.items[0], {
+        amount: 25,
+        description: 'New',
+        scope: 'private',
+        categoryId: 'c9',
+      });
+    });
+
+    const row = result.current.items.find((t) => t.id === 't1');
+    expect(row).toMatchObject({ amount: 25, description: 'New', scope: 'private', category_id: 'c9' });
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 25, description: 'New', scope: 'private', category_id: 'c9' })
+    );
+  });
+
+  it('rolls back an update and surfaces the error when the write fails', async () => {
+    results.select = { data: [tx({ id: 't1', amount: 10, description: 'Old' })], error: null };
+    results.update = { error: { message: 'update denied' } };
+    const { result } = await renderHook(() => useTransactions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateTransaction(result.current.items[0], { amount: 99 });
+    });
+
+    expect(result.current.items.find((t) => t.id === 't1')?.amount).toBe(10);
+    expect(result.current.error).toBe('update denied');
   });
 
   it('merges realtime INSERT and DELETE events', async () => {

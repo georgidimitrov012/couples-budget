@@ -42,7 +42,8 @@ import {
 export default function BudgetScreen() {
   const theme = useTheme();
   const { t, lang } = useTranslation();
-  const { items, loading, error, addTransaction, removeTransaction, retry } = useTransactions();
+  const { items, loading, error, addTransaction, removeTransaction, updateTransaction, retry } =
+    useTransactions();
   const { categories } = useCategories();
   const { user } = useAuth();
   const { members } = useHousehold();
@@ -62,6 +63,9 @@ export default function BudgetScreen() {
   const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
   const [boughtQty, setBoughtQty] = useState(1);
   const [addToList, setAddToList] = useState(false);
+  // Non-null while editing an existing transaction (the add form doubles as the
+  // edit form, pre-filled). Only the owner can edit (transactions_update RLS).
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const currentMonth = monthKeyOf(new Date());
   const [monthKey, setMonthKey] = useState(currentMonth);
@@ -120,12 +124,7 @@ export default function BudgetScreen() {
     const bought = boughtQty;
     const alsoAdd = showAddToList && addToList;
 
-    setAmount('');
-    setDescription('');
-    setCategoryId(null);
-    setLinkedItemId(null);
-    setBoughtQty(1);
-    setAddToList(false);
+    resetForm();
 
     await addTransaction({
       amount: parsedAmount,
@@ -140,6 +139,44 @@ export default function BudgetScreen() {
       await completeItem(linked, bought);
     } else if (alsoAdd && finalDesc) {
       await addListItem(finalDesc, { checked: true, category: categorize(finalDesc) });
+    }
+  }
+
+  function resetForm() {
+    setAmount('');
+    setDescription('');
+    setCategoryId(null);
+    setLinkedItemId(null);
+    setBoughtQty(1);
+    setAddToList(false);
+    setEditingId(null);
+  }
+
+  // Load a transaction into the form to edit it (owner-only).
+  function startEdit(tx: Transaction) {
+    setEditingId(tx.id);
+    setAmount(String(tx.amount));
+    setDescription(tx.description ?? '');
+    setScope(tx.scope);
+    setCategoryId(tx.category_id);
+    setLinkedItemId(null);
+    setAddToList(false);
+  }
+
+  async function handleUpdate() {
+    if (parsedAmount == null || !editingId) return;
+    const original = items.find((x) => x.id === editingId);
+    const selectedCategoryId = categoryId;
+    const nextScope = scope;
+    const nextDesc = trimmedDesc;
+    resetForm();
+    if (original) {
+      await updateTransaction(original, {
+        amount: parsedAmount,
+        description: nextDesc,
+        scope: nextScope,
+        categoryId: selectedCategoryId,
+      });
     }
   }
 
@@ -237,7 +274,7 @@ export default function BudgetScreen() {
               <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
             )}
 
-            {isCurrentMonth && (
+            {(isCurrentMonth || editingId) && (
               <ThemedView type="backgroundElement" style={styles.addCard}>
               <View style={styles.amountRow}>
                 <TextInput
@@ -261,7 +298,7 @@ export default function BudgetScreen() {
                 value={description}
                 onChangeText={setDescription}
                 returnKeyType="done"
-                onSubmitEditing={handleAdd}
+                onSubmitEditing={editingId ? handleUpdate : handleAdd}
               />
 
               {categories.length > 0 && (
@@ -288,26 +325,45 @@ export default function BudgetScreen() {
                 </ScrollView>
               )}
 
-              <ListLink
-                activeItems={activeItems}
-                linkedItem={linkedItem}
-                onSelect={selectListItem}
-                boughtQty={boughtQty}
-                onBoughtQty={setBoughtQty}
-                showAddToList={showAddToList}
-                addToList={addToList}
-                onToggleAddToList={() => setAddToList((v) => !v)}
-                descLabel={trimmedDesc}
-              />
+              {!editingId && (
+                <ListLink
+                  activeItems={activeItems}
+                  linkedItem={linkedItem}
+                  onSelect={selectListItem}
+                  boughtQty={boughtQty}
+                  onBoughtQty={setBoughtQty}
+                  showAddToList={showAddToList}
+                  addToList={addToList}
+                  onToggleAddToList={() => setAddToList((v) => !v)}
+                  descLabel={trimmedDesc}
+                />
+              )}
 
-              <Pressable
-                onPress={handleAdd}
-                disabled={!canAdd}
-                accessibilityRole="button"
-                accessibilityLabel={t('budget.addExpense')}
-                style={({ pressed }) => [styles.addButton, { opacity: pressed || !canAdd ? 0.6 : 1 }]}>
-                <ThemedText style={styles.addButtonText}>{t('budget.addExpense')}</ThemedText>
-              </Pressable>
+              <View style={styles.formActions}>
+                {editingId && (
+                  <Pressable
+                    onPress={resetForm}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('budget.cancel')}
+                    style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}>
+                    <ThemedText style={styles.cancelButtonText}>{t('budget.cancel')}</ThemedText>
+                  </Pressable>
+                )}
+                <Pressable
+                  onPress={editingId ? handleUpdate : handleAdd}
+                  disabled={!canAdd}
+                  accessibilityRole="button"
+                  accessibilityLabel={editingId ? t('budget.save') : t('budget.addExpense')}
+                  style={({ pressed }) => [
+                    styles.addButton,
+                    styles.formActionGrow,
+                    { opacity: pressed || !canAdd ? 0.6 : 1 },
+                  ]}>
+                  <ThemedText style={styles.addButtonText}>
+                    {editingId ? t('budget.save') : t('budget.addExpense')}
+                  </ThemedText>
+                </Pressable>
+              </View>
               </ThemedView>
             )}
 
@@ -345,6 +401,7 @@ export default function BudgetScreen() {
                     item={item}
                     category={item.category_id ? categoryById.get(item.category_id) : undefined}
                     onRemove={() => removeTransaction(item)}
+                    onEdit={item.owner_id === user?.id ? () => startEdit(item) : undefined}
                   />
                 ))}
               </View>
@@ -663,10 +720,12 @@ function TransactionRow({
   item,
   category,
   onRemove,
+  onEdit,
 }: {
   item: Transaction;
   category?: Category;
   onRemove: () => void;
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const { format } = useCurrency();
@@ -705,6 +764,18 @@ function TransactionRow({
         </View>
       </View>
       <ThemedText style={styles.rowAmount}>{format(Number(item.amount))}</ThemedText>
+      {onEdit && (
+        <Pressable
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={t('budget.editExpense', { name: desc })}
+          hitSlop={8}
+          style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
+          <ThemedText type="small" themeColor="textSecondary">
+            ✎
+          </ThemedText>
+        </Pressable>
+      )}
       <Pressable
         onPress={onRemove}
         accessibilityRole="button"
@@ -871,6 +942,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
+  formActions: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.two },
+  formActionGrow: { flex: 1 },
+  cancelButton: {
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   banner: {
     borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,

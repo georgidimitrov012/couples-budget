@@ -129,6 +129,9 @@ const en: Dict = {
   'budget.addToList': 'Add “{name}” to shopping list',
   'budget.expense': 'Expense',
   'budget.removeExpense': 'Remove {name}',
+  'budget.editExpense': 'Edit {name}',
+  'budget.save': 'Save',
+  'budget.cancel': 'Cancel',
   'budget.limit': 'Limit {amount}',
 
   // Settle up
@@ -394,6 +397,9 @@ const bg: Dict = {
   'budget.addToList': 'Добави „{name}“ в списъка',
   'budget.expense': 'Разход',
   'budget.removeExpense': 'Премахни {name}',
+  'budget.editExpense': 'Редактирай {name}',
+  'budget.save': 'Запази',
+  'budget.cancel': 'Отказ',
   'budget.limit': 'Лимит {amount}',
 
   // Settle up
