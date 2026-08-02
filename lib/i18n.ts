@@ -19,6 +19,7 @@ const en: Dict = {
   'common.tryAgain': 'Try again',
   'common.done': 'Done',
   'common.close': 'Close',
+  'common.cancel': 'Cancel',
   'crash.title': 'Something went wrong',
   'crash.body': 'The app hit an unexpected error. Try again — if it keeps happening, please let us know.',
   'error.tapRetry': '{error} — tap to retry',
@@ -174,6 +175,10 @@ const en: Dict = {
   'cat.limitFor': 'Monthly limit for {name}',
   'cat.changeIcon': 'Change icon for {name}',
   'cat.removeCategory': 'Remove {name}',
+  'cat.deleteTitle': 'Delete “{name}”?',
+  'cat.deleteBody':
+    'Expenses in this category keep their amounts but lose the label. This can’t be undone.',
+  'cat.deleteConfirm': 'Delete',
   'cat.color': 'Color {color}',
   'cat.icon': 'Icon {icon}',
 
@@ -305,6 +310,7 @@ const bg: Dict = {
   'common.tryAgain': 'Опитай пак',
   'common.done': 'Готово',
   'common.close': 'Затвори',
+  'common.cancel': 'Отказ',
   'crash.title': 'Нещо се обърка',
   'crash.body': 'Приложението срещна неочаквана грешка. Опитай пак — ако продължава, моля пиши ни.',
   'error.tapRetry': '{error} — докосни за нов опит',
@@ -460,6 +466,10 @@ const bg: Dict = {
   'cat.limitFor': 'Месечен лимит за {name}',
   'cat.changeIcon': 'Смени иконата за {name}',
   'cat.removeCategory': 'Премахни {name}',
+  'cat.deleteTitle': 'Изтриване на „{name}“?',
+  'cat.deleteBody':
+    'Разходите в тази категория запазват сумите си, но губят етикета. Действието е необратимо.',
+  'cat.deleteConfirm': 'Изтрий',
   'cat.color': 'Цвят {color}',
   'cat.icon': 'Икона {icon}',
 

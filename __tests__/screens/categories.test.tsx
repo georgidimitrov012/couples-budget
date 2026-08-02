@@ -1,10 +1,19 @@
 import { fireEvent, render, screen, userEvent } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 
 const mockUseCategories = jest.fn();
 jest.mock('../../hooks/useCategories', () => ({ useCategories: () => mockUseCategories() }));
 jest.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
 
 import CategoriesScreen from '../../src/app/(app)/categories';
+
+// Auto-confirm: invoke the destructive button the delete dialog passes to Alert.
+function autoConfirm() {
+  return jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+    const destructive = (buttons ?? []).find((b) => b.style === 'destructive');
+    destructive?.onPress?.();
+  });
+}
 
 type Cat = {
   id: string;
@@ -48,7 +57,11 @@ function baseValue() {
   };
 }
 
-beforeEach(() => mockCategories());
+beforeEach(() => {
+  mockCategories();
+  // Default: user dismisses the delete dialog without pressing a button.
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+});
 
 describe('CategoriesScreen', () => {
   it('shows a spinner while loading', async () => {
@@ -175,6 +188,7 @@ describe('CategoriesScreen', () => {
 
   it('lists categories and only allows deleting your own', async () => {
     const removeCategory = jest.fn().mockResolvedValue({ error: null });
+    autoConfirm(); // press "Delete" in the confirmation dialog
     mockCategories({
       categories: [
         cat({ id: 'c1', name: 'Food', owner_id: 'u1' }),
@@ -191,6 +205,19 @@ describe('CategoriesScreen', () => {
     expect(screen.queryByLabelText('Remove Rent')).toBeNull();
 
     await user.press(screen.getByLabelText('Remove Food'));
-    expect(removeCategory).toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalled();
+    expect(removeCategory).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }));
+  });
+
+  it('does not delete a category when the confirmation is dismissed', async () => {
+    const removeCategory = jest.fn().mockResolvedValue({ error: null });
+    // beforeEach installs the default (dismiss) Alert mock — no button pressed.
+    mockCategories({ categories: [cat({ id: 'c1', name: 'Food', owner_id: 'u1' })], removeCategory });
+    const user = userEvent.setup();
+    await render(<CategoriesScreen />);
+
+    await user.press(screen.getByLabelText('Remove Food'));
+    expect(Alert.alert).toHaveBeenCalled();
+    expect(removeCategory).not.toHaveBeenCalled();
   });
 });

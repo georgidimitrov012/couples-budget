@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -107,6 +108,15 @@ export default function CategoriesScreen() {
   function handleSetLimit(cat: Category, next: number | null) {
     if (next === cat.monthly_limit) return;
     updateCategory(cat, { monthlyLimit: next });
+  }
+
+  // Deleting a category untags its transactions (on delete set null), so confirm
+  // first — the expenses survive but silently lose this label.
+  function confirmRemove(cat: Category) {
+    Alert.alert(t('cat.deleteTitle', { name: cat.name }), t('cat.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('cat.deleteConfirm'), style: 'destructive', onPress: () => removeCategory(cat) },
+    ]);
   }
 
   return (
@@ -222,7 +232,7 @@ export default function CategoriesScreen() {
                   canEdit={item.owner_id === user?.id}
                   onSetLimit={(next) => handleSetLimit(item, next)}
                   onSetIcon={(emoji) => updateCategory(item, { icon: emoji })}
-                  onRemove={() => removeCategory(item)}
+                  onRemove={() => confirmRemove(item)}
                 />
               )}
             />
