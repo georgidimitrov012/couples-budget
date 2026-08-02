@@ -1,15 +1,18 @@
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
 
 const mockUseTransactions = jest.fn();
 const mockUseCategories = jest.fn();
 const mockUseShoppingList = jest.fn();
 const mockUseListItems = jest.fn();
+const mockShareCsv = jest.fn().mockResolvedValue({ ok: true });
 jest.mock('../../hooks/useTransactions', () => ({ useTransactions: () => mockUseTransactions() }));
 jest.mock('../../hooks/useCategories', () => ({ useCategories: () => mockUseCategories() }));
 jest.mock('../../hooks/useShoppingList', () => ({ useShoppingList: () => mockUseShoppingList() }));
 jest.mock('../../hooks/useListItems', () => ({
   useListItems: (...a: unknown[]) => mockUseListItems(...a),
 }));
+// Mock the native glue so expo-sharing / expo-file-system never load in Jest.
+jest.mock('../../lib/export-csv', () => ({ shareCsv: (...a: unknown[]) => mockShareCsv(...a) }));
 
 import StatsScreen from '../../src/app/(app)/stats';
 
@@ -40,6 +43,7 @@ beforeEach(() => {
   mockUseCategories.mockReturnValue({ categories: [] });
   mockUseShoppingList.mockReturnValue({ listId: 'L1' });
   mockUseListItems.mockReturnValue({ items: [] });
+  mockShareCsv.mockClear();
 });
 
 describe('StatsScreen', () => {
@@ -52,6 +56,25 @@ describe('StatsScreen', () => {
     mockUseTransactions.mockReturnValue({ items: [], loading: true });
     await render(<StatsScreen />);
     expect(screen.getByTestId('stats-loading')).toBeTruthy();
+  });
+
+  it('exports the transactions to CSV via the share sheet', async () => {
+    mockUseTransactions.mockReturnValue({
+      items: [tx({ id: 't1', amount: 12.5, scope: 'shared', category_id: 'c1' })],
+      loading: false,
+    });
+    mockUseCategories.mockReturnValue({ categories: [FOOD] });
+    const user = userEvent.setup();
+    await render(<StatsScreen />);
+
+    await user.press(screen.getByLabelText('Export CSV'));
+
+    await waitFor(() => expect(mockShareCsv).toHaveBeenCalled());
+    const [filename, content] = mockShareCsv.mock.calls[0];
+    expect(filename).toMatch(/\.csv$/);
+    expect(content).toContain('Date,Description,Category,Scope,Amount');
+    expect(content).toContain('Food'); // category name resolved from id
+    expect(content).toContain('12.50');
   });
 
   it('totals the month, splits Ours/Mine and breaks down by category', async () => {
