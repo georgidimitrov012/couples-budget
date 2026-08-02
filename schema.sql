@@ -125,6 +125,27 @@ create table public.transactions (
 );
 
 -- ----------------------------------------------------------------
+-- recurring_rules (rent, subscriptions → auto-added to the budget monthly)
+-- A rule describes a monthly expense. A scheduled DB job (apply_due_recurring,
+-- run daily by pg_cron — see docs/SUPABASE_SETUP.md §14) inserts the matching
+-- transaction each month once day_of_month has arrived, advancing
+-- last_charged_month so it fires only once per calendar month. Same
+-- Yours/Mine/Ours visibility as transactions.
+-- ----------------------------------------------------------------
+create table public.recurring_rules (
+  id                 uuid primary key default gen_random_uuid(),
+  household_id       uuid not null references public.households(id) on delete cascade,
+  owner_id           uuid not null references auth.users(id),
+  category_id        uuid references public.categories(id) on delete set null,
+  amount             numeric(12,2) not null check (amount > 0),
+  description        text,
+  scope              text not null default 'shared' check (scope in ('private','shared')),
+  day_of_month       int not null default 1 check (day_of_month between 1 and 28),
+  last_charged_month text,   -- 'YYYY-MM' of the last month a transaction was created
+  created_at         timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------
 -- settlements ("who owes whom" settle-up)
 -- Shared expenses are split 50/50; whoever paid is owed half by their
 -- partner. A settlement records a payback (from_user paid to_user) and
@@ -228,6 +249,7 @@ alter table public.households         enable row level security;
 alter table public.household_members  enable row level security;
 alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
+alter table public.recurring_rules    enable row level security;
 alter table public.settlements        enable row level security;
 alter table public.receipts           enable row level security;
 alter table public.shopping_lists     enable row level security;
@@ -277,6 +299,19 @@ create policy "transactions_delete" on public.transactions
     owner_id = auth.uid()
     or (scope = 'shared' and public.is_household_member(household_id))
   );
+
+-- recurring_rules: same visibility as transactions; write only your own
+create policy "recurring_rules_select" on public.recurring_rules
+  for select using (
+    public.is_household_member(household_id)
+    and (scope = 'shared' or owner_id = auth.uid())
+  );
+create policy "recurring_rules_insert" on public.recurring_rules
+  for insert with check (public.is_household_member(household_id) and owner_id = auth.uid());
+create policy "recurring_rules_update" on public.recurring_rules
+  for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "recurring_rules_delete" on public.recurring_rules
+  for delete using (owner_id = auth.uid());
 
 -- settlements: visible to both members; either member may record one (a payback
 -- is agreed between partners), but both parties must belong to that household.
@@ -566,6 +601,56 @@ end;
 $$;
 
 grant execute on function public.apply_receipt(uuid, text, text, date, text, jsonb) to authenticated;
+
+-- ----------------------------------------------------------------
+-- apply_due_recurring(): the scheduled monthly charge for recurring_rules.
+-- Run daily by pg_cron (see docs/SUPABASE_SETUP.md §14). SECURITY DEFINER so it
+-- can insert on behalf of any rule owner; NOT client-callable (EXECUTE revoked
+-- below). Idempotent per month: the atomic compare-and-set on last_charged_month
+-- means a rule fires at most once per calendar month even if the job runs many
+-- times. day_of_month is capped at 28 (table CHECK) so make_date always resolves.
+-- Returns the number of transactions created.
+-- ----------------------------------------------------------------
+create or replace function public.apply_due_recurring()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r   record;
+  n   integer := 0;
+  cur text := to_char(current_date, 'YYYY-MM');
+begin
+  for r in
+    select * from public.recurring_rules
+    where (last_charged_month is null or last_charged_month < cur)
+      and extract(day from current_date) >= day_of_month
+  loop
+    -- Claim the month atomically; only the winning update proceeds to insert.
+    update public.recurring_rules
+       set last_charged_month = cur
+     where id = r.id
+       and (last_charged_month is null or last_charged_month < cur);
+    if found then
+      insert into public.transactions
+        (household_id, owner_id, amount, description, occurred_on, scope, category_id)
+      values
+        (r.household_id, r.owner_id, r.amount, r.description,
+         make_date(
+           extract(year  from current_date)::int,
+           extract(month from current_date)::int,
+           r.day_of_month
+         ),
+         r.scope, r.category_id);
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+
+revoke all on function public.apply_due_recurring() from public, anon, authenticated;
 
 -- ----------------------------------------------------------------
 -- Realtime: broadcast changes for the live shopping list (+ budget)

@@ -211,6 +211,17 @@ export default function BudgetScreen() {
                   </ThemedText>
                 </Pressable>
               </Link>
+              <Link href="/recurring" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('recurring.title')}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedText type="smallBold" style={styles.link}>
+                    {t('budget.recurring')}
+                  </ThemedText>
+                </Pressable>
+              </Link>
             </View>
           </View>
 
@@ -827,11 +838,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.three,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
   link: { color: Accent.primary },
-  headerLinks: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
+  // Wraps to a second line on narrow screens / longer (Bulgarian) labels rather
+  // than squeezing the title off-screen.
+  headerLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: Spacing.three,
+    alignItems: 'center',
+    flexShrink: 1,
+  },
   switcher: {
     flexDirection: 'row',
     alignItems: 'center',

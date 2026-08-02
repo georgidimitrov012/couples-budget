@@ -439,3 +439,110 @@ It skips everything else and skips solo households and members with no push toke
 2. Background the app on device B. On device A: add a list item → device B gets
    "*A added … to the list*". Repeat for check-off, a shared expense, and a fresh join.
 3. Tapping the notification opens the list or budget. Verify the language matches device B's.
+
+---
+
+## 14. Recurring transactions — table + scheduled monthly charge
+
+Rent/subscriptions the app records automatically each month. A `recurring_rules` row describes
+the monthly expense; a scheduled DB job inserts the matching `transactions` row once the day of
+month has arrived. Fresh projects get all of this inline from `schema.sql`; an existing project
+applies it in three steps.
+
+### 14a. Migration: table + RLS + the scheduled function
+
+Run once in the SQL Editor:
+
+```sql
+create table public.recurring_rules (
+  id                 uuid primary key default gen_random_uuid(),
+  household_id       uuid not null references public.households(id) on delete cascade,
+  owner_id           uuid not null references auth.users(id),
+  category_id        uuid references public.categories(id) on delete set null,
+  amount             numeric(12,2) not null check (amount > 0),
+  description        text,
+  scope              text not null default 'shared' check (scope in ('private','shared')),
+  day_of_month       int not null default 1 check (day_of_month between 1 and 28),
+  last_charged_month text,
+  created_at         timestamptz not null default now()
+);
+
+alter table public.recurring_rules enable row level security;
+
+create policy "recurring_rules_select" on public.recurring_rules
+  for select using (
+    public.is_household_member(household_id)
+    and (scope = 'shared' or owner_id = auth.uid())
+  );
+create policy "recurring_rules_insert" on public.recurring_rules
+  for insert with check (public.is_household_member(household_id) and owner_id = auth.uid());
+create policy "recurring_rules_update" on public.recurring_rules
+  for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "recurring_rules_delete" on public.recurring_rules
+  for delete using (owner_id = auth.uid());
+
+-- The scheduled monthly charge. SECURITY DEFINER so it can insert for any owner;
+-- NOT client-callable (EXECUTE revoked). Idempotent per calendar month.
+create or replace function public.apply_due_recurring()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r   record;
+  n   integer := 0;
+  cur text := to_char(current_date, 'YYYY-MM');
+begin
+  for r in
+    select * from public.recurring_rules
+    where (last_charged_month is null or last_charged_month < cur)
+      and extract(day from current_date) >= day_of_month
+  loop
+    update public.recurring_rules
+       set last_charged_month = cur
+     where id = r.id
+       and (last_charged_month is null or last_charged_month < cur);
+    if found then
+      insert into public.transactions
+        (household_id, owner_id, amount, description, occurred_on, scope, category_id)
+      values
+        (r.household_id, r.owner_id, r.amount, r.description,
+         make_date(extract(year from current_date)::int,
+                   extract(month from current_date)::int, r.day_of_month),
+         r.scope, r.category_id);
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+
+revoke all on function public.apply_due_recurring() from public, anon, authenticated;
+```
+
+### 14b. Schedule it with pg_cron
+
+Enable the extension (Dashboard → Database → Extensions → enable **`pg_cron`**, or run
+`create extension if not exists pg_cron;`), then schedule a daily run:
+
+```sql
+select cron.schedule(
+  'apply-due-recurring',
+  '0 6 * * *',                       -- every day at 06:00 UTC
+  $$ select public.apply_due_recurring(); $$
+);
+```
+
+Running daily (not monthly) means no month is ever missed: each rule fires on the first daily
+run on/after its `day_of_month`, and the per-month compare-and-set guarantees it fires only
+once. To change or remove it later: `select cron.unschedule('apply-due-recurring');`.
+
+### 14c. Smoke-test
+
+1. In the app (Budget → **Recurring**), add a rule with today's day of month.
+2. Force a run now instead of waiting for 06:00: `select public.apply_due_recurring();` — it
+   should return `1` and a matching expense should appear on the Budget tab (live, via realtime).
+3. Run it again immediately → it returns `0` (already charged this month).
+4. `pnpm test:security` — the recurring-rules RLS checks (incl. "a client cannot call
+   apply_due_recurring") should pass.

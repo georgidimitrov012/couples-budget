@@ -135,6 +135,22 @@ const en: Dict = {
   'budget.save': 'Save',
   'budget.cancel': 'Cancel',
   'budget.limit': 'Limit {amount}',
+  'budget.recurring': 'Recurring',
+  'recurring.title': 'Recurring',
+  'recurring.explainer':
+    'Rent, subscriptions and other monthly expenses — recorded in your budget automatically each month.',
+  'recurring.amountA11y': 'Amount',
+  'recurring.dayLabel': 'Day',
+  'recurring.dayA11y': 'Day of month',
+  'recurring.descPlaceholder': 'What is it? (e.g. Rent)',
+  'recurring.add': 'Add',
+  'recurring.addRule': 'Add recurring expense',
+  'recurring.onDay': 'on day {day}',
+  'recurring.emptyTitle': 'No recurring expenses',
+  'recurring.emptyHint':
+    'Add rent or a subscription and it will be recorded automatically each month.',
+  'recurring.removeRule': 'Remove {name}',
+  'recurring.defaultName': 'Recurring expense',
 
   // Settle up
   'settle.allSquare': "You're all square",
@@ -405,6 +421,22 @@ const bg: Dict = {
   'budget.save': 'Запази',
   'budget.cancel': 'Отказ',
   'budget.limit': 'Лимит {amount}',
+  'budget.recurring': 'Повтарящи се',
+  'recurring.title': 'Повтарящи се разходи',
+  'recurring.explainer':
+    'Наем, абонаменти и други месечни разходи — добавят се в бюджета ви автоматично всеки месец.',
+  'recurring.amountA11y': 'Сума',
+  'recurring.dayLabel': 'Ден',
+  'recurring.dayA11y': 'Ден от месеца',
+  'recurring.descPlaceholder': 'Какво е? (напр. Наем)',
+  'recurring.add': 'Добави',
+  'recurring.addRule': 'Добави повтарящ се разход',
+  'recurring.onDay': 'на {day}-о число',
+  'recurring.emptyTitle': 'Няма повтарящи се разходи',
+  'recurring.emptyHint':
+    'Добавете наем или абонамент и той ще се записва автоматично всеки месец.',
+  'recurring.removeRule': 'Премахни {name}',
+  'recurring.defaultName': 'Повтарящ се разход',
 
   // Settle up
   'settle.allSquare': 'Няма задължения',
