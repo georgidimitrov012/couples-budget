@@ -9,6 +9,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { transactionsToCsv } from '../../../lib/csv';
+import { shareCsv } from '../../../lib/export-csv';
 import { monthLong, monthShort } from '../../../lib/month';
 import {
   biggestExpense,
@@ -42,6 +44,7 @@ export default function StatsScreen() {
 
   const currentMonth = monthKeyOf(new Date());
   const [monthKey, setMonthKey] = useState(currentMonth);
+  const [exporting, setExporting] = useState(false);
 
   const totals = useMemo(() => monthTotals(items, monthKey), [items, monthKey]);
   const prevTotal = useMemo(() => monthTotal(items, previousMonthKey(monthKey)), [items, monthKey]);
@@ -66,6 +69,32 @@ export default function StatsScreen() {
         : delta > 0
           ? t('stats.deltaUp', { pct: Math.round(delta * 100) })
           : t('stats.deltaDown', { pct: Math.round(Math.abs(delta) * 100) });
+
+  // Export every transaction the user can see (all months) to a CSV and open the
+  // share sheet. Ordered oldest-first so the file reads like a ledger.
+  async function handleExport() {
+    if (exporting || items.length === 0) return;
+    setExporting(true);
+    const rows = [...items]
+      .sort((a, b) => a.occurred_on.localeCompare(b.occurred_on))
+      .map((tx) => ({
+        occurred_on: tx.occurred_on,
+        description: tx.description,
+        categoryName: tx.category_id ? categoryById.get(tx.category_id)?.name ?? null : null,
+        scope: tx.scope,
+        amount: Number(tx.amount),
+      }));
+    const csv = transactionsToCsv(rows, {
+      date: t('csv.date'),
+      description: t('csv.description'),
+      category: t('csv.category'),
+      scope: t('csv.scope'),
+      amount: t('csv.amount'),
+    });
+    const filename = `couples-budget-${new Date().toISOString().slice(0, 10)}.csv`;
+    await shareCsv(filename, csv, t('stats.exportTitle'));
+    setExporting(false);
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -201,6 +230,21 @@ export default function StatsScreen() {
                   </View>
                 </ThemedView>
               )}
+
+              <Pressable
+                onPress={handleExport}
+                disabled={exporting}
+                accessibilityRole="button"
+                accessibilityLabel={t('stats.exportCsv')}
+                style={({ pressed }) => [styles.exportButton, { opacity: pressed || exporting ? 0.6 : 1 }]}>
+                {exporting ? (
+                  <ActivityIndicator testID="stats-exporting" />
+                ) : (
+                  <ThemedText type="smallBold" style={styles.exportText}>
+                    {t('stats.exportCsv')}
+                  </ThemedText>
+                )}
+              </Pressable>
             </ScrollView>
           )}
         </View>
@@ -298,6 +342,15 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: Spacing.five, gap: Spacing.three },
+  exportButton: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportText: { color: Accent.primary },
   switcher: {
     flexDirection: 'row',
     alignItems: 'center',
