@@ -23,6 +23,50 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
 }));
 
+// Reanimated boots the native worklets runtime on import, which doesn't exist
+// under Jest — and its own `react-native-reanimated/mock` is no help because it
+// re-imports the real module. Stub just the surface our components use:
+// Animated.View renders as a plain View, and the builders are chainable no-ops.
+jest.mock('react-native-worklets', () => ({
+  scheduleOnRN: (fn: (...args: unknown[]) => unknown, ...args: unknown[]) => fn(...args),
+}));
+
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const identity = (t: number) => t;
+  const easingFactory = () => identity;
+
+  class Keyframe {
+    duration() {
+      return this;
+    }
+    withCallback() {
+      return this;
+    }
+  }
+
+  return {
+    __esModule: true,
+    // Drop the animation props so they don't leak onto the host component.
+    default: {
+      View: ({ entering, exiting, layout, ...props }: Record<string, unknown>) =>
+        React.createElement(View, props),
+    },
+    Keyframe,
+    Easing: {
+      quad: identity,
+      linear: identity,
+      ease: identity,
+      in: easingFactory,
+      out: easingFactory,
+      inOut: easingFactory,
+      elastic: easingFactory,
+      bezier: easingFactory,
+    },
+  };
+});
+
 // Sentry pulls in native modules; stub the JS API so crash-reporting code can be
 // imported and asserted on without touching the native SDK.
 jest.mock('@sentry/react-native', () => ({
