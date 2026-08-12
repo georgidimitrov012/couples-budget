@@ -57,11 +57,5 @@
     "test:security": "node tests/security/run-security.mjs",
     "test:all": "jest && node tests/security/run-security.mjs"
   },
-  "private": true,
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@sentry/cli",
-      "unrs-resolver"
-    ]
-  }
+  "private": true
 }

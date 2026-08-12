@@ -1,0 +1,25 @@
+# pnpm settings live here, NOT in package.json's "pnpm" field — pnpm 11 dropped
+# that field entirely, so a package.json-only setting is silently ignored.
+#
+# Two dependencies need their install scripts to run. pnpm refuses to run any by
+# default and treats the refusal as fatal on CI (ERR_PNPM_IGNORED_BUILDS), which
+# is what broke EAS Build:
+#   - @sentry/cli     fetches the sentry-cli binary that @sentry/react-native's
+#                     Gradle plugin shells out to for the source-map upload.
+#   - unrs-resolver   selects its platform napi binary; backs eslint's import
+#                     resolution (pnpm lint).
+#
+# BOTH keys below are required, because the setting was renamed across the major
+# version boundary we straddle: local dev runs pnpm 10, EAS Build runs pnpm 11.
+# Each version reads its own key and ignores the other. Keep them in sync.
+# Deliberately an allow-list — do not swap either for a blanket allow-all.
+
+# pnpm 11+ (EAS Build)
+allowBuilds:
+  '@sentry/cli': true
+  unrs-resolver: true
+
+# pnpm 10 (local dev)
+onlyBuiltDependencies:
+  - '@sentry/cli'
+  - unrs-resolver
