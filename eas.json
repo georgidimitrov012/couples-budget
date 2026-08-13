@@ -15,11 +15,17 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://tsmhvhhrluwupcyoiyoq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_OW5TjEL9DobiE4Zqan0fNA_PkIfPXuc"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_OW5TjEL9DobiE4Zqan0fNA_PkIfPXuc",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_DISABLE_NATIVE_DEBUG_UPLOAD": "true"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_DISABLE_NATIVE_DEBUG_UPLOAD": "true"
+      }
     }
   },
   "submit": {
