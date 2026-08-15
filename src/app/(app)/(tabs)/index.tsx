@@ -74,7 +74,12 @@ export default function HomeScreen() {
               <ThemedText type="smallBold" themeColor="textSecondary">
                 {t('home.shareCode')}
               </ThemedText>
-              <ThemedText style={[styles.code, { color: Accent.primary }]} selectable>
+              <ThemedText
+                style={[styles.code, { color: Accent.primary }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                selectable>
                 {household?.invite_code ?? '——————'}
               </ThemedText>
               <View style={styles.waitingRow}>
@@ -194,7 +199,16 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: Radius.xl,
   },
-  code: { fontSize: 40, fontWeight: '800', letterSpacing: 6 },
+  // 8 chars at 40/letterSpacing 6 ran the full card width and read as a wall of
+  // glyphs. Smaller + tighter tracking, stretched so adjustsFontSizeToFit has a
+  // width to shrink against (it no-ops on a content-sized Text).
+  code: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 3,
+    alignSelf: 'stretch',
+    textAlign: 'center',
+  },
   waitingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   regenerateText: { color: Accent.primary, fontWeight: '600' },
   nextWrap: { alignSelf: 'stretch', gap: Spacing.two },

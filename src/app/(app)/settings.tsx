@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -72,8 +73,7 @@ export default function SettingsScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">{t('settings.title')}</ThemedText>
+          <ScreenHeader title={t('settings.title')}>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
@@ -82,7 +82,7 @@ export default function SettingsScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
-          </View>
+          </ScreenHeader>
 
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold" themeColor="textSecondary">
@@ -216,13 +216,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
   },
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },

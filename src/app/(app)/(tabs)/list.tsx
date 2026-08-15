@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -111,8 +112,7 @@ export default function ListScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">{t('list.title')}</ThemedText>
+          <ScreenHeader title={t('list.title')}>
             {checkedCount > 0 && (
               <Pressable
                 onPress={clearChecked}
@@ -125,7 +125,7 @@ export default function ListScreen() {
                 </ThemedText>
               </Pressable>
             )}
-          </View>
+          </ScreenHeader>
 
           {error && (
             <Pressable
@@ -362,13 +362,6 @@ const styles = StyleSheet.create({
     paddingBottom: BottomTabInset + Spacing.three,
   },
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
-  },
   pressed: { opacity: 0.6 },
   banner: {
     borderRadius: Spacing.three,

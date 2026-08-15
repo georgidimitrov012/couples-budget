@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScopeToggle } from '@/components/scope-toggle';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -123,8 +124,7 @@ export default function CategoriesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">{t('cat.title')}</ThemedText>
+          <ScreenHeader title={t('cat.title')}>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
@@ -133,7 +133,7 @@ export default function CategoriesScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
-          </View>
+          </ScreenHeader>
 
           <ThemedView type="backgroundElement" style={styles.addCard}>
             <TextInput
@@ -361,13 +361,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
   },
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },
