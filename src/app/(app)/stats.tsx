@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ProgressBar } from '@/components/progress-bar';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -100,8 +101,7 @@ export default function StatsScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">{t('stats.title')}</ThemedText>
+          <ScreenHeader title={t('stats.title')}>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
@@ -110,7 +110,7 @@ export default function StatsScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
-          </View>
+          </ScreenHeader>
 
           {loading && !hasAnyData ? (
             <View style={styles.center}>
@@ -152,7 +152,13 @@ export default function StatsScreen() {
                   <ThemedText type="smallBold" themeColor="textSecondary" style={styles.heroLabel}>
                     {t('stats.spent')}
                   </ThemedText>
-                  <ThemedText style={styles.heroValue}>{format(totals.total)}</ThemedText>
+                  <ThemedText
+                    style={styles.heroValue}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}>
+                    {format(totals.total)}
+                  </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {deltaLabel}
                   </ThemedText>
@@ -330,13 +336,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
-  },
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -362,7 +361,16 @@ const styles = StyleSheet.create({
   switchLabel: { fontSize: 17, fontWeight: '700' },
   hero: { borderRadius: Radius.lg, padding: Spacing.four, gap: Spacing.one, alignItems: 'flex-start' },
   heroLabel: { letterSpacing: 0.6 },
-  heroValue: { fontSize: 40, fontWeight: '800', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  // Stretched so adjustsFontSizeToFit has a width to shrink against — a
+  // content-sized Text never shrinks. Big totals (or a long currency suffix)
+  // scale down instead of running past the card.
+  heroValue: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    fontVariant: ['tabular-nums'],
+    alignSelf: 'stretch',
+  },
   trendRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScopeToggle } from '@/components/scope-toggle';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -105,8 +106,7 @@ export default function ReceiptScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">Scan receipt</ThemedText>
+          <ScreenHeader title="Scan receipt">
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
@@ -115,7 +115,7 @@ export default function ReceiptScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={styles.close}>{phase === 'review' ? 'Cancel' : 'Done'}</ThemedText>
             </Pressable>
-          </View>
+          </ScreenHeader>
 
           {error && (
             <ThemedText type="small" style={styles.errorText}>
@@ -297,13 +297,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
   },
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },

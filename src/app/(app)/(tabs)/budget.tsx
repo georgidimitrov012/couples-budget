@@ -16,6 +16,7 @@ import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScopeToggle } from '@/components/scope-toggle';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -186,8 +187,7 @@ export default function BudgetScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.inner}>
-          <View style={styles.headerRow}>
-            <ThemedText type="subtitle">{t('budget.title')}</ThemedText>
+          <ScreenHeader title={t('budget.title')}>
             <View style={styles.headerLinks}>
               <Link href="/stats" asChild>
                 <Pressable
@@ -223,7 +223,7 @@ export default function BudgetScreen() {
                 </Pressable>
               </Link>
             </View>
-          </View>
+          </ScreenHeader>
 
           <View style={styles.switcher}>
             <Pressable
@@ -834,14 +834,6 @@ const styles = StyleSheet.create({
   // height and leaves dead space above the tab bar. Tab clearance lives on the
   // content padding so the list can scroll fully clear of the native tab bar.
   scroll: { flex: 1 },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.three,
-  },
   link: { color: Accent.primary },
   // Wraps to a second line on narrow screens / longer (Bulgarian) labels rather
   // than squeezing the title off-screen.

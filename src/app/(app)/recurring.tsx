@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScopeToggle } from '@/components/scope-toggle';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -74,8 +75,7 @@ export default function RecurringScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">{t('recurring.title')}</ThemedText>
+          <ScreenHeader title={t('recurring.title')}>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
@@ -84,7 +84,7 @@ export default function RecurringScreen() {
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={styles.close}>{t('common.done')}</ThemedText>
             </Pressable>
-          </View>
+          </ScreenHeader>
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.explainer}>
             {t('recurring.explainer')}
@@ -314,13 +314,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.two,
   },
   close: { color: Accent.primary, fontWeight: '600', fontSize: 16 },
   pressed: { opacity: 0.6 },
