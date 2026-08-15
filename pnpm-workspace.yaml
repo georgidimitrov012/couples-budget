@@ -14,6 +14,12 @@
 # Each version reads its own key and ignores the other. Keep them in sync.
 # Deliberately an allow-list — do not swap either for a blanket allow-all.
 
+# Metro needs a hoisted node_modules to resolve pnpm's layout (see AGENTS.md).
+# .npmrc sets `node-linker=hoisted` for pnpm 10, but pnpm 11 no longer reads that
+# setting from .npmrc — without the line below it silently falls back to
+# "isolated", which is what EAS Build (pnpm 11) had been doing.
+nodeLinker: hoisted
+
 # pnpm 11+ (EAS Build)
 allowBuilds:
   '@sentry/cli': true
