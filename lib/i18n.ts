@@ -308,6 +308,27 @@ const en: Dict = {
   'item.shampoo': 'Shampoo',
   'item.toothpaste': 'Toothpaste',
   'item.soap': 'Soap',
+
+  // Receipt scanning
+  'receipt.title': 'Scan receipt',
+  'receipt.scanLink': '🧾  Scan receipt',
+  'receipt.explainer':
+    'Take or choose a photo of a paper receipt. We’ll pull out the items so you can review them before adding them to your budget.',
+  'receipt.takePhoto': 'Take photo',
+  'receipt.chooseLibrary': 'Choose from library',
+  'receipt.reading': 'Reading your receipt…',
+  'receipt.noItems': 'No items found on that receipt.\nTry a clearer photo.',
+  'receipt.total': 'TOTAL',
+  'receipt.addToBudget': 'Add to budget',
+  'receipt.submitA11y': 'Submit receipt',
+  'receipt.itemName': 'Item name',
+  'receipt.itemPrice': 'Item price',
+  'receipt.itemPlaceholder': 'Item',
+  'receipt.actionAdd': 'Add',
+  'receipt.actionCheck': 'Check',
+  'receipt.actionCheckNamed': 'Check: {name}',
+  'receipt.actionSkip': 'Skip',
+  'receipt.selected': '{label} (selected)',
 };
 
 const bg: Dict = {
@@ -605,6 +626,27 @@ const bg: Dict = {
   'item.shampoo': 'Шампоан',
   'item.toothpaste': 'Паста за зъби',
   'item.soap': 'Сапун',
+
+  // Receipt scanning
+  'receipt.title': 'Сканирай бележка',
+  'receipt.scanLink': '🧾  Сканирай бележка',
+  'receipt.explainer':
+    'Снимай или избери снимка на касова бележка. Ще извадим продуктите, за да ги прегледаш, преди да ги добавиш към бюджета.',
+  'receipt.takePhoto': 'Снимай',
+  'receipt.chooseLibrary': 'Избери от галерията',
+  'receipt.reading': 'Разчитаме бележката…',
+  'receipt.noItems': 'Не открихме продукти в тази бележка.\nОпитай с по-ясна снимка.',
+  'receipt.total': 'ОБЩО',
+  'receipt.addToBudget': 'Добави към бюджета',
+  'receipt.submitA11y': 'Добави бележката',
+  'receipt.itemName': 'Име на продукта',
+  'receipt.itemPrice': 'Цена на продукта',
+  'receipt.itemPlaceholder': 'Продукт',
+  'receipt.actionAdd': 'Добави',
+  'receipt.actionCheck': 'Отметни',
+  'receipt.actionCheckNamed': 'Отметни: {name}',
+  'receipt.actionSkip': 'Пропусни',
+  'receipt.selected': '{label} (избрано)',
 };
 
 export const translations: Record<Lang, Dict> = { en, bg };

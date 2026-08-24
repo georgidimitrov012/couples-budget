@@ -30,12 +30,14 @@ import { useCurrency } from '../../../hooks/useCurrency';
 import { useListItems } from '../../../hooks/useListItems';
 import { useReceiptScan } from '../../../hooks/useReceiptScan';
 import { useShoppingList } from '../../../hooks/useShoppingList';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 type Image = { base64: string; uri: string; mimeType?: string };
 type Phase = 'capture' | 'scanning' | 'review';
 
 export default function ReceiptScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { format } = useCurrency();
   const { listId } = useShoppingList();
   const { items: listItems } = useListItems(listId);
@@ -106,14 +108,16 @@ export default function ReceiptScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.inner}>
-          <ScreenHeader title="Scan receipt">
+          <ScreenHeader title={t('receipt.title')}>
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               hitSlop={8}
               style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText style={styles.close}>{phase === 'review' ? 'Cancel' : 'Done'}</ThemedText>
+              <ThemedText style={styles.close}>
+                {phase === 'review' ? t('common.cancel') : t('common.done')}
+              </ThemedText>
             </Pressable>
           </ScreenHeader>
 
@@ -126,8 +130,7 @@ export default function ReceiptScreen() {
           {phase === 'capture' && (
             <View style={styles.center}>
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                Take or choose a photo of a paper receipt. We&apos;ll pull out the items so you can
-                review them before adding them to your budget.
+                {t('receipt.explainer')}
               </ThemedText>
               {captureError && (
                 <ThemedText type="small" style={styles.errorText}>
@@ -137,16 +140,18 @@ export default function ReceiptScreen() {
               <Pressable
                 onPress={takePhoto}
                 accessibilityRole="button"
-                accessibilityLabel="Take photo"
+                accessibilityLabel={t('receipt.takePhoto')}
                 style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.8 : 1 }]}>
-                <ThemedText style={styles.primaryButtonText}>Take photo</ThemedText>
+                <ThemedText style={styles.primaryButtonText}>{t('receipt.takePhoto')}</ThemedText>
               </Pressable>
               <Pressable
                 onPress={pickPhoto}
                 accessibilityRole="button"
-                accessibilityLabel="Choose from library"
+                accessibilityLabel={t('receipt.chooseLibrary')}
                 style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.6 : 1 }]}>
-                <ThemedText style={styles.secondaryButtonText}>Choose from library</ThemedText>
+                <ThemedText style={styles.secondaryButtonText}>
+                  {t('receipt.chooseLibrary')}
+                </ThemedText>
               </Pressable>
             </View>
           )}
@@ -155,7 +160,7 @@ export default function ReceiptScreen() {
             <View style={styles.center}>
               <ActivityIndicator testID="receipt-scanning" />
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                Reading your receipt…
+                {t('receipt.reading')}
               </ThemedText>
             </View>
           )}
@@ -172,7 +177,7 @@ export default function ReceiptScreen() {
               {lines.length === 0 ? (
                 <View style={styles.center}>
                   <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                    No items found on that receipt.{'\n'}Try a clearer photo.
+                    {t('receipt.noItems')}
                   </ThemedText>
                 </View>
               ) : (
@@ -189,7 +194,7 @@ export default function ReceiptScreen() {
               <View style={styles.footer}>
                 <View style={styles.totalRow}>
                   <ThemedText type="smallBold" themeColor="textSecondary">
-                    TOTAL
+                    {t('receipt.total')}
                   </ThemedText>
                   <ThemedText type="subtitle" testID="receipt-total">
                     {format(total)}
@@ -199,7 +204,7 @@ export default function ReceiptScreen() {
                   onPress={handleSubmit}
                   disabled={!valid || applying}
                   accessibilityRole="button"
-                  accessibilityLabel="Submit receipt"
+                  accessibilityLabel={t('receipt.submitA11y')}
                   style={({ pressed }) => [
                     styles.primaryButton,
                     { opacity: pressed || !valid || applying ? 0.6 : 1 },
@@ -207,7 +212,9 @@ export default function ReceiptScreen() {
                   {applying ? (
                     <ActivityIndicator color={Accent.onPrimary} />
                   ) : (
-                    <ThemedText style={styles.primaryButtonText}>Add to budget</ThemedText>
+                    <ThemedText style={styles.primaryButtonText}>
+                      {t('receipt.addToBudget')}
+                    </ThemedText>
                   )}
                 </Pressable>
               </View>
@@ -227,10 +234,17 @@ function ReviewRow({
   onChange: (patch: Partial<ReviewLine>) => void;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const actions: { value: LineAction; label: string; hidden?: boolean }[] = [
-    { value: 'add', label: 'Add' },
-    { value: 'check', label: line.matchName ? `Check: ${line.matchName}` : 'Check', hidden: !line.listItemId },
-    { value: 'skip', label: 'Skip' },
+    { value: 'add', label: t('receipt.actionAdd') },
+    {
+      value: 'check',
+      label: line.matchName
+        ? t('receipt.actionCheckNamed', { name: line.matchName })
+        : t('receipt.actionCheck'),
+      hidden: !line.listItemId,
+    },
+    { value: 'skip', label: t('receipt.actionSkip') },
   ];
   const dim = line.action === 'skip';
 
@@ -241,9 +255,9 @@ function ReviewRow({
           style={[styles.nameInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
           value={line.name}
           onChangeText={(name) => onChange({ name })}
-          placeholder="Item"
+          placeholder={t('receipt.itemPlaceholder')}
           placeholderTextColor={theme.textSecondary}
-          accessibilityLabel="Item name"
+          accessibilityLabel={t('receipt.itemName')}
         />
         <TextInput
           style={[styles.priceInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -252,7 +266,7 @@ function ReviewRow({
           keyboardType="decimal-pad"
           placeholder="0.00"
           placeholderTextColor={theme.textSecondary}
-          accessibilityLabel="Item price"
+          accessibilityLabel={t('receipt.itemPrice')}
         />
       </View>
 
@@ -268,7 +282,7 @@ function ReviewRow({
                   onPress={() => onChange({ action: a.value })}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
-                  accessibilityLabel={`${a.label}${active ? ' (selected)' : ''}`}
+                  accessibilityLabel={active ? t('receipt.selected', { label: a.label }) : a.label}
                   style={[
                     styles.actionChip,
                     { borderColor: theme.backgroundSelected },
