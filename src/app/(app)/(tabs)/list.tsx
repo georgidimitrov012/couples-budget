@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -169,15 +170,29 @@ export default function ListScreen() {
             </Pressable>
           </View>
 
-          <Pressable
-            onPress={() => setShowCatalog((s) => !s)}
-            accessibilityRole="button"
-            accessibilityLabel={t('list.browseCommon')}
-            style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
-            <ThemedText type="smallBold" style={styles.catalogToggleText}>
-              {showCatalog ? t('list.hideCommon') : t('list.commonItems')}
-            </ThemedText>
-          </Pressable>
+          <View style={styles.quickRow}>
+            <Pressable
+              onPress={() => setShowCatalog((s) => !s)}
+              accessibilityRole="button"
+              accessibilityLabel={t('list.browseCommon')}
+              style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
+              <ThemedText type="smallBold" style={styles.catalogToggleText}>
+                {showCatalog ? t('list.hideCommon') : t('list.commonItems')}
+              </ThemedText>
+            </Pressable>
+
+            <Link href="/receipt" asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt.title')}
+                hitSlop={8}
+                style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
+                <ThemedText type="smallBold" style={styles.scanLink}>
+                  {t('receipt.scanLink')}
+                </ThemedText>
+              </Pressable>
+            </Link>
+          </View>
 
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -390,6 +405,16 @@ const styles = StyleSheet.create({
   addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 26, lineHeight: 30 },
   catalogToggle: { paddingVertical: Spacing.two, marginBottom: Spacing.one },
   catalogToggleText: { color: Accent.primary },
+  // "Common items" on the left, "Scan receipt" on the right; wraps rather than
+  // clipping when either label grows.
+  quickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  scanLink: { color: Accent.primary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
   listContent: { paddingBottom: Spacing.four, gap: Spacing.two },
