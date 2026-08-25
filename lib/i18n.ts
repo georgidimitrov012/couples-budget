@@ -329,6 +329,16 @@ const en: Dict = {
   'receipt.actionCheckNamed': 'Check: {name}',
   'receipt.actionSkip': 'Skip',
   'receipt.selected': '{label} (selected)',
+  // Permission states are split: "denied but we can ask again" vs "blocked, only
+  // Settings can undo it" — telling someone to open Settings when a retry would
+  // do is just as unhelpful as the reverse.
+  'receipt.cameraDenied': 'Camera access is needed to scan a receipt.',
+  'receipt.cameraBlocked': 'Camera access is off. Turn it on in Settings to scan a receipt.',
+  'receipt.libraryDenied': 'Photo access is needed to pick a receipt.',
+  'receipt.libraryBlocked': 'Photo access is off. Turn it on in Settings to pick a receipt.',
+  'receipt.scanFailed': 'Could not read the receipt. Please try again.',
+  'receipt.noHousehold': 'No household.',
+  'receipt.uploadFailed': 'Could not save the receipt image: {error}',
 };
 
 const bg: Dict = {
@@ -647,6 +657,15 @@ const bg: Dict = {
   'receipt.actionCheckNamed': 'Отметни: {name}',
   'receipt.actionSkip': 'Пропусни',
   'receipt.selected': '{label} (избрано)',
+  'receipt.cameraDenied': 'Нужен е достъп до камерата, за да сканираш бележка.',
+  'receipt.cameraBlocked':
+    'Достъпът до камерата е изключен. Включи го от Настройки, за да сканираш бележка.',
+  'receipt.libraryDenied': 'Нужен е достъп до снимките, за да избереш бележка.',
+  'receipt.libraryBlocked':
+    'Достъпът до снимките е изключен. Включи го от Настройки, за да избереш бележка.',
+  'receipt.scanFailed': 'Не успяхме да разчетем бележката. Опитай пак.',
+  'receipt.noHousehold': 'Няма домакинство.',
+  'receipt.uploadFailed': 'Снимката на бележката не беше запазена: {error}',
 };
 
 export const translations: Record<Lang, Dict> = { en, bg };

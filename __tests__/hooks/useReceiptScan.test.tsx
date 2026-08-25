@@ -112,7 +112,9 @@ describe('useReceiptScan', () => {
     });
     expect(ok).toBe(false);
     expect(mockRpc).not.toHaveBeenCalled();
-    await waitFor(() => expect(result.current.error).toMatch(/couldn't save/i));
+    // The message is translated now; assert on the Supabase detail it wraps
+    // rather than the copy, so rewording it doesn't fail this test again.
+    await waitFor(() => expect(result.current.error).toMatch(/storage down/i));
   });
 
   it('apply() cleans up the uploaded image when the RPC fails', async () => {

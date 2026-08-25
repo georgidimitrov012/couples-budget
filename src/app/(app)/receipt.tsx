@@ -70,7 +70,7 @@ export default function ReceiptScreen() {
     setCaptureError(null);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      setCaptureError('Camera access is needed to scan a receipt. Enable it in Settings.');
+      setCaptureError(perm.canAskAgain ? t('receipt.cameraDenied') : t('receipt.cameraBlocked'));
       return;
     }
     const res = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] });
@@ -80,6 +80,11 @@ export default function ReceiptScreen() {
 
   async function pickPhoto() {
     setCaptureError(null);
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setCaptureError(perm.canAskAgain ? t('receipt.libraryDenied') : t('receipt.libraryBlocked'));
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] });
     const asset = res.canceled ? null : res.assets[0];
     if (asset?.base64) runScan({ base64: asset.base64, uri: asset.uri, mimeType: asset.mimeType });
