@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,13 +8,14 @@ import { Accent, Radius, Spacing } from '@/constants/theme';
 import { formatMoney } from '../../../lib/currency';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { chainName } from './chains';
-import { unitPrice, type Offer } from './deals';
+import { summarizeOffers, unitPrice, type Offer } from './deals';
 import { displayDate, fill, STRINGS } from './strings';
 import { useItemOffers, type ItemDeal } from './useDeals';
 
 // Prices come from the shops in euro, whatever display currency the user picked.
 const eur = (n: number) => formatMoney(n, 'EUR');
-const SHEET_LIMIT = 15;
+// One chain's full list can run to hundreds of products ("bread" at Lidl).
+const CHAIN_LIMIT = 30;
 const SALE = Accent.mine;
 const SALE_WASH = 'rgba(242, 106, 75, 0.12)';
 
@@ -57,7 +58,11 @@ function DealSheet({ deal, onClose }: { deal: ItemDeal; onClose: () => void }) {
   const s = STRINGS[lang];
   const insets = useSafeAreaInsets();
   const { offers, loading, error, retry } = useItemOffers(deal.match);
-  const shown = offers.slice(0, SHEET_LIMIT);
+  const summary = useMemo(() => summarizeOffers(offers), [offers]);
+  // null = the overview (best per chain + top deals); a chain id = that chain's list.
+  const [openChain, setOpenChain] = useState<string | null>(null);
+  const chainOffers = summary.chains.find((c) => c.chain === openChain)?.offers ?? [];
+  const chainShown = chainOffers.slice(0, CHAIN_LIMIT);
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -84,19 +89,64 @@ function DealSheet({ deal, onClose }: { deal: ItemDeal; onClose: () => void }) {
                 {s.loadError}
               </ThemedText>
             </Pressable>
-          ) : shown.length === 0 ? (
+          ) : offers.length === 0 ? (
             <ThemedText type="small" themeColor="textSecondary" style={styles.state}>
               {s.empty}
             </ThemedText>
+          ) : openChain ? (
+            <ScrollView style={styles.offers} contentContainerStyle={styles.offersContent}>
+              <Pressable
+                onPress={() => setOpenChain(null)}
+                accessibilityRole="button"
+                hitSlop={8}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedText type="smallBold" style={styles.link}>
+                  {s.allStores}
+                </ThemedText>
+              </Pressable>
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+                {fill(s.chainProducts, { chain: chainName(openChain), n: chainOffers.length })}
+              </ThemedText>
+              {chainShown.map((offer, i) => (
+                <OfferRow key={`${offer.productName}-${i}`} offer={offer} />
+              ))}
+              {chainOffers.length > chainShown.length && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {fill(s.more, { n: chainOffers.length - chainShown.length })}
+                </ThemedText>
+              )}
+            </ScrollView>
           ) : (
             <ScrollView style={styles.offers} contentContainerStyle={styles.offersContent}>
-              {shown.map((offer, i) => (
-                <OfferRow key={`${offer.chain}-${offer.productName}-${i}`} offer={offer} />
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+                {s.bestPerChain}
+              </ThemedText>
+              {summary.chains.map(({ chain, best, offers: list }) => (
+                <View key={chain} style={styles.chainBlock}>
+                  <OfferRow offer={best} />
+                  {list.length > 1 && (
+                    <Pressable
+                      onPress={() => setOpenChain(chain)}
+                      accessibilityRole="button"
+                      accessibilityLabel={fill(s.showAllA11y, { chain: chainName(chain), n: list.length })}
+                      hitSlop={6}
+                      style={({ pressed }) => pressed && styles.pressed}>
+                      <ThemedText type="small" style={styles.link}>
+                        {fill(s.showAll, { n: list.length })}
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                </View>
               ))}
-              {offers.length > shown.length && (
-                <ThemedText type="small" themeColor="textSecondary">
-                  {fill(s.more, { n: offers.length - shown.length })}
-                </ThemedText>
+              {summary.topDeals.length > 0 && (
+                <>
+                  <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+                    {s.topDeals}
+                  </ThemedText>
+                  {summary.topDeals.map((offer, i) => (
+                    <OfferRow key={`top-${offer.chain}-${offer.productName}-${i}`} offer={offer} />
+                  ))}
+                </>
               )}
             </ScrollView>
           )}
@@ -190,6 +240,9 @@ const styles = StyleSheet.create({
   offers: { flexShrink: 1 },
   offersContent: { gap: Spacing.three, paddingVertical: Spacing.two },
   offer: { flexDirection: 'row', gap: Spacing.three },
+  chainBlock: { gap: Spacing.one },
+  sectionLabel: { letterSpacing: 0.5, textTransform: 'uppercase', marginTop: Spacing.two },
+  link: { color: Accent.primary },
   offerMain: { flex: 1, gap: 2 },
   offerPrice: { alignItems: 'flex-end' },
   saleText: { color: SALE },

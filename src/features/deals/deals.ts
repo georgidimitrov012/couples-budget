@@ -18,6 +18,8 @@ export type DealPriceRow = {
 
 /** A promo counts as "on sale at <chain>" only if most of its stores have it. */
 export const CHAIN_WIDE_SHARE = 0.8;
+/** A badge needs at least this discount — "−4%" on garlic isn't worth a flag. */
+export const MIN_BADGE_DISCOUNT_PCT = 10;
 /** Prices older than this many days are hidden rather than shown as current. */
 export const MAX_AGE_DAYS = 2;
 
@@ -89,10 +91,13 @@ function matchingOffers(match: ItemMatch, rows: DealPriceRow[], cutoff: string):
     .map(toOffer);
 }
 
-/** The best chain-wide sale for an item, or null if nothing matching is on sale. */
+/**
+ * The best chain-wide sale for an item, or null if nothing matching is on sale by
+ * at least MIN_BADGE_DISCOUNT_PCT (smaller cuts still show in the sheet).
+ */
 export function bestSale(match: ItemMatch, rows: DealPriceRow[], cutoff: string): ItemSale | null {
   const sales = matchingOffers(match, rows, cutoff)
-    .filter((o) => o.onSale)
+    .filter((o) => o.onSale && (o.discountPct ?? 0) >= MIN_BADGE_DISCOUNT_PCT)
     .sort(compareOffers);
   if (sales.length === 0) return null;
   const best = sales[0];
@@ -103,4 +108,53 @@ export function bestSale(match: ItemMatch, rows: DealPriceRow[], cutoff: string)
 /** Every matching product across chains, cheapest first. */
 export function allOffers(match: ItemMatch, rows: DealPriceRow[], cutoff: string): Offer[] {
   return matchingOffers(match, rows, cutoff).sort(compareOffers);
+}
+
+export type ChainSummary = {
+  chain: string;
+  /** The chain's best sale for the item, else its cheapest product. */
+  best: Offer;
+  /** Every matching product at this chain, sales first, then cheapest. */
+  offers: Offer[];
+};
+
+export type OfferSummary = {
+  /** One row per chain: chains with a sale first, then by price. */
+  chains: ChainSummary[];
+  /** The biggest chain-wide discounts not already shown above, ≤ perChain each. */
+  topDeals: Offer[];
+};
+
+const salesFirst = (a: Offer, b: Offer) => Number(b.onSale) - Number(a.onSale) || compareOffers(a, b);
+
+/**
+ * Shapes a long offer list for the sheet. A broad item ("bread" spans several
+ * groups, ~300 products) sorted only by price filled the sheet with one chain's
+ * cheapest loaves — no comparison at all. So: the best per chain, then the
+ * biggest discounts capped per chain, and each chain's full list on demand.
+ */
+export function summarizeOffers(offers: Offer[], { topLimit = 6, perChain = 2 } = {}): OfferSummary {
+  const byChain = new Map<string, Offer[]>();
+  for (const o of offers) (byChain.get(o.chain) ?? byChain.set(o.chain, []).get(o.chain)!).push(o);
+
+  const chains: ChainSummary[] = [...byChain].map(([chain, list]) => {
+    const sorted = [...list].sort(salesFirst);
+    return { chain, best: sorted[0], offers: sorted };
+  });
+  chains.sort((a, b) => salesFirst(a.best, b.best));
+
+  const shown = new Set(chains.map((c) => c.best));
+  const taken = new Map<string, number>();
+  const topDeals = offers
+    .filter((o) => o.onSale && !shown.has(o))
+    .sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0) || compareOffers(a, b))
+    .filter((o) => {
+      const n = taken.get(o.chain) ?? 0;
+      if (n >= perChain) return false;
+      taken.set(o.chain, n + 1);
+      return true;
+    })
+    .slice(0, topLimit);
+
+  return { chains, topDeals };
 }
