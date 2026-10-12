@@ -226,6 +226,42 @@ export function sameItem(a: string, b: string): boolean {
 }
 
 /**
+ * The still-needed list item an expense description is about, or null. Exact
+ * item first ("Carrots" ↔ "Моркови"), then a description that contains the
+ * item's words ("Моркови 2кг", "морков от пазара") or a catalog word that is the
+ * item ("2 kg carrots" ↔ "Моркови"). Ambiguous hits (two items) return null —
+ * the user can still pick by hand.
+ */
+export function findListMatch<T extends { name: string; is_checked: boolean }>(
+  description: string,
+  items: T[]
+): T | null {
+  const active = items.filter((i) => !i.is_checked);
+  if (!normalizeItemName(description)) return null;
+  const exact = active.filter((i) => sameItem(i.name, description));
+  if (exact.length > 0) return exact.length === 1 ? exact[0] : null;
+
+  // A description that is itself a catalog item only ever means that item
+  // ("Кисело мляко" is yogurt, never the listed "Мляко").
+  if (catalogSlugOf(description)) return null;
+
+  const words = looseForm(description).split(' ');
+  const wordSlugs = new Set(
+    normalizeItemName(description)
+      .split(' ')
+      .map((w) => catalogSlugOf(w))
+      .filter((s): s is string => !!s)
+  );
+  const hits = active.filter((i) => {
+    const itemWords = looseForm(i.name).split(' ');
+    if (itemWords.length > 0 && itemWords.every((w) => words.includes(w))) return true;
+    const slug = catalogSlugOf(i.name);
+    return !!slug && wordSlugs.has(slug);
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/**
  * Best-effort category for a free-typed item: an exact catalog match first,
  * then a word/substring match, else "Other". Keeps grouping sensible without
  * making the user pick a category for every item. Matches English and Bulgarian.

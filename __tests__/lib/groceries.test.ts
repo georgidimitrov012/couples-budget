@@ -5,6 +5,7 @@ import {
   CATEGORY_BY_KEY,
   COMMON_ITEMS,
   displayItemName,
+  findListMatch,
   itemSlug,
   sameItem,
 } from '../../lib/groceries';
@@ -82,5 +83,32 @@ describe('catalog identity across languages', () => {
     expect(sameItem('Моркови', 'Картофи')).toBe(false);
     expect(sameItem('Мляко', 'Кисело мляко')).toBe(false);
     expect(sameItem('', '')).toBe(false);
+  });
+});
+
+describe('findListMatch', () => {
+  const list = (names: string[], checked: string[] = []) =>
+    names.map((name) => ({ name, is_checked: checked.includes(name) }));
+
+  it('finds the listed item an expense names, in either language', () => {
+    expect(findListMatch('Carrots', list(['Моркови', 'Мляко']))?.name).toBe('Моркови');
+    expect(findListMatch('Домат', list(['Домати']))?.name).toBe('Домати');
+  });
+
+  it('finds it inside a longer description', () => {
+    expect(findListMatch('Моркови 2кг', list(['Моркови']))?.name).toBe('Моркови');
+    expect(findListMatch('2 kg carrots', list(['Моркови']))?.name).toBe('Моркови');
+    expect(findListMatch('Бира Загорка за мача', list(['бира']))?.name).toBe('бира');
+  });
+
+  it('never matches a different catalog item that shares a word', () => {
+    expect(findListMatch('Кисело мляко', list(['Мляко']))).toBeNull();
+  });
+
+  it('ignores ticked-off items, unrelated text and ambiguous hits', () => {
+    expect(findListMatch('Carrots', list(['Моркови'], ['Моркови']))).toBeNull();
+    expect(findListMatch('Rent', list(['Моркови']))).toBeNull();
+    expect(findListMatch('', list(['Моркови']))).toBeNull();
+    expect(findListMatch('бира', list(['Бира', 'бира']))).toBeNull();
   });
 });

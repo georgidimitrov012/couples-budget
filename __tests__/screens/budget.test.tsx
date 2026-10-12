@@ -552,3 +552,56 @@ describe('BudgetScreen — list items across languages', () => {
     expect(screen.getByText('Домат')).toBeTruthy();
   });
 });
+
+// Regression: with "Carrots" on the list, adding a "Carrots" expense didn't tick
+// it off — linking needed a manual pick from the chips.
+describe('BudgetScreen — an expense ticks off the list item it names', () => {
+  it('auto-links the list item the description names, in either language, and ticks it off', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const completeItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Моркови', category: 'produce', quantity: 2 })],
+      completeItem,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '3');
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Carrots');
+    expect(screen.getByTestId('auto-linked')).toBeTruthy();
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalledWith(expect.objectContaining({ description: 'Carrots' }));
+    expect(completeItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), 2);
+  });
+
+  it('"None" keeps the list item on the list', async () => {
+    const completeItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction: jest.fn().mockResolvedValue(undefined) });
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Milk' })],
+      completeItem,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '3');
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'milk');
+    await user.press(screen.getByLabelText('No list item'));
+    expect(screen.queryByTestId('auto-linked')).toBeNull();
+    await user.press(screen.getByLabelText('Add expense'));
+    expect(completeItem).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-link an unrelated expense', async () => {
+    const completeItem = jest.fn();
+    mockUseListItems.mockReturnValue({ ...listBase, items: [listItem({ id: 'i1', name: 'Milk' })], completeItem });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Rent');
+    expect(screen.queryByTestId('auto-linked')).toBeNull();
+  });
+});

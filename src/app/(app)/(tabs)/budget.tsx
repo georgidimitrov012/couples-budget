@@ -23,7 +23,7 @@ import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from
 import { useTheme } from '@/hooks/use-theme';
 import { budgetAlerts, budgetLevel, monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
-import { categorize, displayItemName, sameItem } from '../../../../lib/groceries';
+import { categorize, displayItemName, findListMatch, sameItem } from '../../../../lib/groceries';
 import { monthLong } from '../../../../lib/month';
 import { monthKeyOf, nextMonthKey, previousMonthKey } from '../../../../lib/stats';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -61,8 +61,12 @@ export default function BudgetScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   // Optional wiring to the shopping list (see the "List↔Budget model" in AGENTS): an
   // expense can complete a listed item (quantity-aware) or log an off-list buy onto it.
+  // A list item picked by hand; otherwise the one the description names is linked
+  // automatically ("Carrots" ticks off "Моркови") unless the user chose "None".
   const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
-  const [boughtQty, setBoughtQty] = useState(1);
+  const [autoLinkOff, setAutoLinkOff] = useState(false);
+  // null = all of the listed quantity.
+  const [boughtQty, setBoughtQty] = useState<number | null>(null);
   const [addToList, setAddToList] = useState(false);
   // Non-null while editing an existing transaction (the add form doubles as the
   // edit form, pre-filled). Only the owner can edit (transactions_update RLS).
@@ -80,20 +84,26 @@ export default function BudgetScreen() {
   const canAdd = parsedAmount != null;
 
   const activeItems = useMemo(() => listItems.filter((i) => !i.is_checked), [listItems]);
-  const linkedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
   const trimmedDesc = description.trim();
-  // Offer "also add to the list" only for a fresh off-list name (not one already
+  const pickedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
+  const autoItem =
+    !pickedItem && !autoLinkOff && !editingId ? findListMatch(trimmedDesc, activeItems) : null;
+  const linkedItem = pickedItem ?? autoItem;
+  const bought = linkedItem ? Math.min(boughtQty ?? linkedItem.quantity, linkedItem.quantity) : 1;
+  // Offer "also log it on the list" only for a fresh off-list name (not one already
   // listed — in either language: "Carrots" is listed when "Моркови" is).
   const showAddToList =
-    !linkedItemId && trimmedDesc.length > 0 && !activeItems.some((i) => sameItem(i.name, trimmedDesc));
+    !linkedItem && trimmedDesc.length > 0 && !activeItems.some((i) => sameItem(i.name, trimmedDesc));
 
   function selectListItem(item: ListItem | null) {
+    setBoughtQty(null);
     if (!item) {
       setLinkedItemId(null);
+      setAutoLinkOff(true);
       return;
     }
     setLinkedItemId(item.id);
-    setBoughtQty(item.quantity);
+    setAutoLinkOff(false);
     setAddToList(false);
     if (!description.trim()) setDescription(displayItemName(item.name, lang));
   }
@@ -119,7 +129,6 @@ export default function BudgetScreen() {
     const selectedCategoryId = categoryId;
     const linked = linkedItem;
     const finalDesc = trimmedDesc || (linked ? displayItemName(linked.name, lang) : '');
-    const bought = boughtQty;
     const alsoAdd = showAddToList && addToList;
 
     resetForm();
@@ -145,7 +154,8 @@ export default function BudgetScreen() {
     setDescription('');
     setCategoryId(null);
     setLinkedItemId(null);
-    setBoughtQty(1);
+    setAutoLinkOff(false);
+    setBoughtQty(null);
     setAddToList(false);
     setEditingId(null);
   }
@@ -337,8 +347,9 @@ export default function BudgetScreen() {
                 <ListLink
                   activeItems={activeItems}
                   linkedItem={linkedItem}
+                  autoLinked={!!autoItem}
                   onSelect={selectListItem}
-                  boughtQty={boughtQty}
+                  boughtQty={bought}
                   onBoughtQty={setBoughtQty}
                   showAddToList={showAddToList}
                   addToList={addToList}
@@ -626,6 +637,7 @@ function CategoryChip({
 function ListLink({
   activeItems,
   linkedItem,
+  autoLinked,
   onSelect,
   boughtQty,
   onBoughtQty,
@@ -636,6 +648,8 @@ function ListLink({
 }: {
   activeItems: ListItem[];
   linkedItem: ListItem | null;
+  /** The link came from the description, not a tap — say so, so it's never a surprise. */
+  autoLinked: boolean;
   onSelect: (item: ListItem | null) => void;
   boughtQty: number;
   onBoughtQty: (n: number) => void;
@@ -680,6 +694,12 @@ function ListLink({
             })}
           </ScrollView>
         </>
+      )}
+
+      {linkedItem && autoLinked && (
+        <ThemedText type="small" themeColor="textSecondary" testID="auto-linked">
+          {t('budget.autoLinked', { name: displayItemName(linkedItem.name, lang) })}
+        </ThemedText>
       )}
 
       {linkedItem && (
