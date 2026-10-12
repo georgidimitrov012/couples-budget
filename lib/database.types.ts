@@ -58,52 +58,56 @@ export type Database = {
           },
         ]
       }
-      recurring_rules: {
+      deal_prices: {
         Row: {
-          amount: number
-          category_id: string | null
-          created_at: string
-          day_of_month: number
-          description: string | null
-          household_id: string
-          id: string
-          last_charged_month: string | null
-          owner_id: string
-          scope: string
+          chain: string
+          group_code: number
+          price_date: string
+          product_code: string
+          product_name: string
+          promo_price: number | null
+          promo_share: number
+          retail_price: number
         }
         Insert: {
-          amount: number
-          category_id?: string | null
-          created_at?: string
-          day_of_month?: number
-          description?: string | null
-          household_id: string
-          id?: string
-          last_charged_month?: string | null
-          owner_id: string
-          scope?: string
+          chain: string
+          group_code: number
+          price_date: string
+          product_code: string
+          product_name: string
+          promo_price?: number | null
+          promo_share?: number
+          retail_price: number
         }
         Update: {
-          amount?: number
-          category_id?: string | null
-          created_at?: string
-          day_of_month?: number
-          description?: string | null
-          household_id?: string
-          id?: string
-          last_charged_month?: string | null
-          owner_id?: string
-          scope?: string
+          chain?: string
+          group_code?: number
+          price_date?: string
+          product_code?: string
+          product_name?: string
+          promo_price?: number | null
+          promo_share?: number
+          retail_price?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "recurring_rules_household_id_fkey"
-            columns: ["household_id"]
-            isOneToOne: false
-            referencedRelation: "households"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       household_members: {
         Row: {
@@ -289,6 +293,60 @@ export type Database = {
           },
         ]
       }
+      recurring_rules: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          day_of_month: number
+          description: string | null
+          household_id: string
+          id: string
+          last_charged_month: string | null
+          owner_id: string
+          scope: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          description?: string | null
+          household_id: string
+          id?: string
+          last_charged_month?: string | null
+          owner_id: string
+          scope?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          description?: string | null
+          household_id?: string
+          id?: string
+          last_charged_month?: string | null
+          owner_id?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_rules_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settlements: {
         Row: {
           amount: number
@@ -433,6 +491,7 @@ export type Database = {
         Args: { p_user: string }
         Returns: undefined
       }
+      apply_due_recurring: { Args: never; Returns: number }
       apply_receipt: {
         Args: {
           p_currency: string
@@ -513,6 +572,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      replace_deal_prices: {
+        Args: { p_chain: string; p_price_date: string; p_rows: Json }
+        Returns: number
+      }
       shares_household_with: { Args: { other: string }; Returns: boolean }
     }
     Enums: {
@@ -532,12 +595,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -561,11 +624,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -586,11 +649,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -611,11 +674,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -628,11 +691,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

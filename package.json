@@ -55,7 +55,8 @@
     "gen:types": "pnpm dlx supabase gen types typescript --project-id tsmhvhhrluwupcyoiyoq > lib/database.types.ts",
     "test": "jest",
     "test:security": "node tests/security/run-security.mjs",
-    "test:all": "jest && node tests/security/run-security.mjs"
+    "test:all": "jest && node tests/security/run-security.mjs",
+    "deals:ingest": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/features/deals/ingest/run.mjs"
   },
   "private": true,
   "packageManager": "pnpm@11.9.0"

@@ -3,9 +3,10 @@
 Steps that live in the Supabase **dashboard / SQL editor**, not in code. Keep this in
 sync when the schema or auth config changes.
 
-> The app uses the **anon / publishable key only**. The `service_role` key is **test-only**
-> (see below) and must never appear in app code or in any `EXPO_PUBLIC_*` variable — it
-> bypasses Row-Level Security.
+> The app uses the **anon / publishable key only**. The `service_role` key is for the
+> security tests (`.env`, see below) and the server-side deals job (a GitHub Actions secret,
+> §15) — it must never appear in app code or in any `EXPO_PUBLIC_*` variable — it bypasses
+> Row-Level Security.
 
 ---
 
@@ -573,3 +574,71 @@ once. To change or remove it later: `select cron.unschedule('apply-due-recurring
 3. Run it again immediately → it returns `0` (already charged this month).
 4. `pnpm test:security` — the recurring-rules RLS checks (incl. "a client cannot call
    apply_due_recurring") should pass.
+
+## 15. Supermarket deals — switch, prices table, ingest RPC
+
+The removable deals feature (overview, legal notes and removal steps: [`docs/DEALS.md`](DEALS.md)).
+Fresh projects get it from `schema.sql`; an existing project runs this once in the SQL Editor.
+It's idempotent — safe to re-run.
+
+```sql
+create table if not exists public.feature_flags (
+  key        text primary key,
+  enabled    boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+alter table public.feature_flags enable row level security;
+drop policy if exists "feature_flags_select" on public.feature_flags;
+create policy "feature_flags_select" on public.feature_flags
+  for select to authenticated using (true);
+insert into public.feature_flags (key, enabled) values ('deals', false)
+  on conflict (key) do nothing;
+
+create table if not exists public.deal_prices (
+  chain        text not null check (chain in ('lidl', 'kaufland', 'billa', 'fantastico', 'tmarket')),
+  product_code text not null,
+  product_name text not null,
+  group_code   smallint not null check (group_code between 1 and 85 and group_code <> 78),
+  retail_price numeric(10,2) not null check (retail_price > 0),
+  promo_price  numeric(10,2) check (promo_price > 0 and promo_price < retail_price),
+  promo_share  real not null default 0 check (promo_share between 0 and 1),
+  price_date   date not null,
+  primary key (chain, product_code)
+);
+create index if not exists deal_prices_group_idx on public.deal_prices (group_code);
+alter table public.deal_prices enable row level security;
+drop policy if exists "deal_prices_select" on public.deal_prices;
+create policy "deal_prices_select" on public.deal_prices
+  for select to authenticated using (
+    exists (select 1 from public.feature_flags f where f.key = 'deals' and f.enabled)
+  );
+
+create or replace function public.replace_deal_prices(p_chain text, p_price_date date, p_rows jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n integer;
+begin
+  delete from public.deal_prices where chain = p_chain;
+  insert into public.deal_prices
+    (chain, product_code, product_name, group_code, retail_price, promo_price, promo_share, price_date)
+  select p_chain, r.product_code, r.product_name, r.group_code, r.retail_price, r.promo_price,
+         coalesce(r.promo_share, 0), p_price_date
+  from jsonb_to_recordset(p_rows) as r(
+    product_code text, product_name text, group_code smallint,
+    retail_price numeric, promo_price numeric, promo_share real
+  );
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+revoke all on function public.replace_deal_prices(text, date, jsonb) from public, anon, authenticated;
+grant execute on function public.replace_deal_prices(text, date, jsonb) to service_role;
+```
+
+The switch starts **off**. Turning it on/off, the GitHub secrets for the job and running it are
+in [`docs/DEALS.md`](DEALS.md). After applying, run `pnpm test:security` — the deals checks
+(clients can't write prices or flip the switch; members see prices only while it's on) should pass.

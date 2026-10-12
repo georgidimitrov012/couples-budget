@@ -653,6 +653,81 @@ $$;
 revoke all on function public.apply_due_recurring() from public, anon, authenticated;
 
 -- ----------------------------------------------------------------
+-- [deals] Supermarket deals — removable feature, see docs/DEALS.md.
+-- Prices come from КЗП's "Колко струва" open data via a GitHub Actions job
+-- (service role → replace_deal_prices). Clients can only read, and only while
+-- the 'deals' switch is on: flip it off and every app stops showing prices at
+-- once, no build needed.
+-- ----------------------------------------------------------------
+create table if not exists public.feature_flags (
+  key        text primary key,
+  enabled    boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.feature_flags enable row level security;
+
+-- Readable (the deal_prices policy below checks it as the caller); no client writes.
+drop policy if exists "feature_flags_select" on public.feature_flags;
+create policy "feature_flags_select" on public.feature_flags
+  for select to authenticated using (true);
+
+insert into public.feature_flags (key, enabled) values ('deals', false)
+  on conflict (key) do nothing;
+
+-- One row per chain × product: the most common regular price across the chain's
+-- stores, the most common promo price, and the share of stores reporting it.
+create table if not exists public.deal_prices (
+  chain        text not null check (chain in ('lidl', 'kaufland', 'billa', 'fantastico', 'tmarket')),
+  product_code text not null,
+  product_name text not null,
+  group_code   smallint not null check (group_code between 1 and 85 and group_code <> 78),
+  retail_price numeric(10,2) not null check (retail_price > 0),
+  promo_price  numeric(10,2) check (promo_price > 0 and promo_price < retail_price),
+  promo_share  real not null default 0 check (promo_share between 0 and 1),
+  price_date   date not null,
+  primary key (chain, product_code)
+);
+
+create index if not exists deal_prices_group_idx on public.deal_prices (group_code);
+
+alter table public.deal_prices enable row level security;
+
+drop policy if exists "deal_prices_select" on public.deal_prices;
+create policy "deal_prices_select" on public.deal_prices
+  for select to authenticated using (
+    exists (select 1 from public.feature_flags f where f.key = 'deals' and f.enabled)
+  );
+
+-- Swap in one chain's prices atomically (the ingest job's only write path).
+-- NOT client-callable: EXECUTE is revoked from anon/authenticated.
+create or replace function public.replace_deal_prices(p_chain text, p_price_date date, p_rows jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n integer;
+begin
+  delete from public.deal_prices where chain = p_chain;
+  insert into public.deal_prices
+    (chain, product_code, product_name, group_code, retail_price, promo_price, promo_share, price_date)
+  select p_chain, r.product_code, r.product_name, r.group_code, r.retail_price, r.promo_price,
+         coalesce(r.promo_share, 0), p_price_date
+  from jsonb_to_recordset(p_rows) as r(
+    product_code text, product_name text, group_code smallint,
+    retail_price numeric, promo_price numeric, promo_share real
+  );
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+revoke all on function public.replace_deal_prices(text, date, jsonb) from public, anon, authenticated;
+grant execute on function public.replace_deal_prices(text, date, jsonb) to service_role;
+
+-- ----------------------------------------------------------------
 -- Realtime: broadcast changes for the live shopping list (+ budget)
 -- (If a table is already in the publication, skip that line.)
 -- ----------------------------------------------------------------

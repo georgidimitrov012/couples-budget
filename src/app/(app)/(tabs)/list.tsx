@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,6 +18,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
+import { DealBadge, useDeals } from '@/features/deals'; // [deals] removable — docs/DEALS.md
 import { useTheme } from '@/hooks/use-theme';
 import {
   categorize,
@@ -75,6 +76,7 @@ export default function ListScreen() {
   } = useListItems(listId);
   const [draft, setDraft] = useState('');
   const [showCatalog, setShowCatalog] = useState(false);
+  const deals = useDeals(items); // [deals]
 
   const error = listError ?? itemsError;
   const loading = listLoading || (itemsLoading && items.length === 0);
@@ -211,19 +213,24 @@ export default function ListScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 stickySectionHeadersEnabled={false}
+                extraData={deals} // [deals] re-render rows when prices arrive
                 renderSectionHeader={({ section }) => (
                   <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeader}>
                     {section.category.emoji}  {t(`grocery.${section.category.key}`).toUpperCase()}
                   </ThemedText>
                 )}
-                renderItem={({ item }) => (
-                  <ListRow
-                    item={item}
-                    onToggle={() => toggleItem(item)}
-                    onQuantity={(n) => setQuantity(item, n)}
-                    onRemove={() => removeItem(item)}
-                  />
-                )}
+                renderItem={({ item }) => {
+                  const deal = item.is_checked ? null : deals.saleFor(item.name); // [deals]
+                  return (
+                    <ListRow
+                      item={item}
+                      onToggle={() => toggleItem(item)}
+                      onQuantity={(n) => setQuantity(item, n)}
+                      onRemove={() => removeItem(item)}
+                      footer={deal && <DealBadge deal={deal} />}
+                    />
+                  );
+                }}
               />
             )}
           </KeyboardAvoidingView>
@@ -292,75 +299,81 @@ function ListRow({
   onToggle,
   onQuantity,
   onRemove,
+  footer,
 }: {
   item: ListItem;
   onToggle: () => void;
   onQuantity: (n: number) => void;
   onRemove: () => void;
+  /** Optional extra line under the item (e.g. a deal badge), aligned with the name. */
+  footer?: ReactNode;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
-      <Pressable
-        onPress={onToggle}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: item.is_checked }}
-        accessibilityLabel={item.name}
-        hitSlop={8}
-        style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
-        <View
-          style={[
-            styles.checkbox,
-            { borderColor: theme.textSecondary },
-            item.is_checked && styles.checkboxChecked,
-          ]}>
-          {item.is_checked && <ThemedText style={styles.checkmark}>✓</ThemedText>}
-        </View>
-        <ThemedText
-          themeColor={item.is_checked ? 'textSecondary' : 'text'}
-          numberOfLines={1}
-          style={[styles.itemName, item.is_checked && styles.itemNameChecked]}>
-          {item.name}
-        </ThemedText>
-      </Pressable>
-
-      {item.is_checked ? null : (
-        <View style={styles.stepper}>
-          <Pressable
-            onPress={() => onQuantity(item.quantity - 1)}
-            disabled={item.quantity <= 1}
-            accessibilityRole="button"
-            accessibilityLabel={t('list.decrease', { name: item.name })}
-            hitSlop={6}
-            style={({ pressed }) => [
-              styles.stepBtn,
-              { backgroundColor: theme.tint, opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 },
+      <View style={styles.rowLine}>
+        <Pressable
+          onPress={onToggle}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: item.is_checked }}
+          accessibilityLabel={item.name}
+          hitSlop={8}
+          style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
+          <View
+            style={[
+              styles.checkbox,
+              { borderColor: theme.textSecondary },
+              item.is_checked && styles.checkboxChecked,
             ]}>
-            <ThemedText style={styles.stepBtnText}>−</ThemedText>
-          </Pressable>
-          <ThemedText style={styles.stepValue}>{item.quantity}</ThemedText>
-          <Pressable
-            onPress={() => onQuantity(item.quantity + 1)}
-            accessibilityRole="button"
-            accessibilityLabel={t('list.increase', { name: item.name })}
-            hitSlop={6}
-            style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
-            <ThemedText style={styles.stepBtnText}>＋</ThemedText>
-          </Pressable>
-        </View>
-      )}
+            {item.is_checked && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+          </View>
+          <ThemedText
+            themeColor={item.is_checked ? 'textSecondary' : 'text'}
+            numberOfLines={1}
+            style={[styles.itemName, item.is_checked && styles.itemNameChecked]}>
+            {item.name}
+          </ThemedText>
+        </Pressable>
 
-      <Pressable
-        onPress={onRemove}
-        accessibilityRole="button"
-        accessibilityLabel={t('list.remove', { name: item.name })}
-        hitSlop={8}
-        style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
-        <ThemedText type="small" themeColor="textSecondary">
-          ✕
-        </ThemedText>
-      </Pressable>
+        {item.is_checked ? null : (
+          <View style={styles.stepper}>
+            <Pressable
+              onPress={() => onQuantity(item.quantity - 1)}
+              disabled={item.quantity <= 1}
+              accessibilityRole="button"
+              accessibilityLabel={t('list.decrease', { name: item.name })}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.stepBtn,
+                { backgroundColor: theme.tint, opacity: item.quantity <= 1 ? 0.35 : pressed ? 0.6 : 1 },
+              ]}>
+              <ThemedText style={styles.stepBtnText}>−</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.stepValue}>{item.quantity}</ThemedText>
+            <Pressable
+              onPress={() => onQuantity(item.quantity + 1)}
+              accessibilityRole="button"
+              accessibilityLabel={t('list.increase', { name: item.name })}
+              hitSlop={6}
+              style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
+              <ThemedText style={styles.stepBtnText}>＋</ThemedText>
+            </Pressable>
+          </View>
+        )}
+
+        <Pressable
+          onPress={onRemove}
+          accessibilityRole="button"
+          accessibilityLabel={t('list.remove', { name: item.name })}
+          hitSlop={8}
+          style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
+          <ThemedText type="small" themeColor="textSecondary">
+            ✕
+          </ThemedText>
+        </Pressable>
+      </View>
+      {footer ? <View style={styles.rowFooter}>{footer}</View> : null}
     </ThemedView>
   );
 }
@@ -428,14 +441,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.two,
     ...Shadow.card,
   },
+  rowLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  // Indented past the checkbox (24) + its gap so the footer lines up with the name.
+  rowFooter: { paddingLeft: 24 + Spacing.three },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   checkbox: {
     width: 24,
