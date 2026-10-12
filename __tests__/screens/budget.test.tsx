@@ -18,6 +18,7 @@ jest.mock('../../hooks/useShoppingList', () => ({ useShoppingList: () => mockUse
 jest.mock('../../hooks/useListItems', () => ({ useListItems: (...a: unknown[]) => mockUseListItems(...a) }));
 
 import BudgetScreen from '../../src/app/(app)/(tabs)/budget';
+import { addDays, lastDayOfMonth, localDay } from '../../lib/month';
 
 const ME = { user_id: 'u1', role: 'owner', joined_at: '', display_name: 'Alex' };
 const PARTNER = { user_id: 'u2', role: 'member', joined_at: '', display_name: 'Maria' };
@@ -170,7 +171,13 @@ describe('BudgetScreen', () => {
     await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Coffee');
     await user.press(screen.getByLabelText('Add expense'));
 
-    expect(addTransaction).toHaveBeenCalledWith({ amount: 12.5, description: 'Coffee', scope: 'shared' });
+    expect(addTransaction).toHaveBeenCalledWith({
+      amount: 12.5,
+      description: 'Coffee',
+      scope: 'shared',
+      occurredOn: localDay(),
+      categoryId: undefined,
+    });
   });
 
   it('adds a private ("Mine") expense when the scope is toggled', async () => {
@@ -183,7 +190,13 @@ describe('BudgetScreen', () => {
     await user.press(screen.getByLabelText('Scope: Mine'));
     await user.press(screen.getByLabelText('Add expense'));
 
-    expect(addTransaction).toHaveBeenCalledWith({ amount: 5, description: '', scope: 'private' });
+    expect(addTransaction).toHaveBeenCalledWith({
+      amount: 5,
+      description: '',
+      scope: 'private',
+      occurredOn: localDay(),
+      categoryId: undefined,
+    });
   });
 
   it('does not add when the amount is empty/invalid', async () => {
@@ -211,6 +224,7 @@ describe('BudgetScreen', () => {
       amount: 10,
       description: '',
       scope: 'shared',
+      occurredOn: localDay(),
       categoryId: 'c1',
     });
   });
@@ -493,17 +507,61 @@ describe('BudgetScreen', () => {
     expect(screen.getByLabelText('Remove Partner buy')).toBeTruthy();
   });
 
-  it('hides the add form on past months (expenses record to today)', async () => {
+  // Regression: there was no way to add an older expense (past months were
+  // read-only and every expense was dated today).
+  it('adds to a past month, dated its last day by default', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.press(screen.getByLabelText('Previous month'));
+    const lastMonth = monthDate(-1).slice(0, 7);
+    await user.type(screen.getByPlaceholderText('0.00'), '12');
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 12, occurredOn: lastDayOfMonth(lastMonth) })
+    );
+  });
+
+  it('defaults to today and steps the date back a day', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    expect(screen.getByTestId('expense-date')).toHaveTextContent('Today');
+    expect(screen.getByLabelText('One day later')).toBeDisabled();
+    await user.press(screen.getByLabelText('One day earlier'));
+    expect(screen.getByTestId('expense-date')).toHaveTextContent('Yesterday');
+    await user.type(screen.getByPlaceholderText('0.00'), '5');
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredOn: addDays(localDay(), -1) })
+    );
+  });
+
+  it('edits keep the expense date, and can change it', async () => {
+    const updateTransaction = jest.fn().mockResolvedValue(undefined);
+    const day = thisMonthDate(10);
     mockUseTransactions.mockReturnValue({
       ...base,
-      items: [tx({ id: 'now', occurred_on: monthDate(0) })],
+      items: [tx({ id: 't1', owner_id: 'u1', description: 'Coffee', occurred_on: day })],
+      updateTransaction,
     });
     const user = userEvent.setup();
     await render(<BudgetScreen />);
 
-    expect(screen.getByLabelText('Add expense')).toBeTruthy();
-    await user.press(screen.getByLabelText('Previous month'));
-    expect(screen.queryByLabelText('Add expense')).toBeNull();
+    await user.press(screen.getByLabelText('Edit Coffee'));
+    await user.press(screen.getByLabelText('One day earlier'));
+    await user.press(screen.getByLabelText('Save'));
+
+    expect(updateTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 't1' }),
+      expect.objectContaining({ occurredOn: addDays(day, -1) })
+    );
   });
 });
 

@@ -24,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { budgetAlerts, budgetLevel, monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
 import { categorize, displayItemName, findListMatch, sameItem } from '../../../../lib/groceries';
-import { monthLong } from '../../../../lib/month';
+import { addDays, dayLabel, lastDayOfMonth, localDay, monthLong } from '../../../../lib/month';
 import { monthKeyOf, nextMonthKey, previousMonthKey } from '../../../../lib/stats';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
@@ -71,10 +71,20 @@ export default function BudgetScreen() {
   // Non-null while editing an existing transaction (the add form doubles as the
   // edit form, pre-filled). Only the owner can edit (transactions_update RLS).
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The day the expense happened; null = the default for the month on screen
+  // (today, or the last day of a past month you're looking at).
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
 
   const currentMonth = monthKeyOf(new Date());
   const [monthKey, setMonthKey] = useState(currentMonth);
   const isCurrentMonth = monthKey === currentMonth;
+  const today = localDay();
+  const formDate = pickedDate ?? (isCurrentMonth ? today : lastDayOfMonth(monthKey));
+
+  function goToMonth(key: string) {
+    setMonthKey(key);
+    if (!editingId) setPickedDate(null); // follow the month unless mid-edit
+  }
 
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -130,13 +140,18 @@ export default function BudgetScreen() {
     const linked = linkedItem;
     const finalDesc = trimmedDesc || (linked ? displayItemName(linked.name, lang) : '');
     const alsoAdd = showAddToList && addToList;
+    const occurredOn = formDate;
 
     resetForm();
+    // Show the month the expense landed in (stepping the date back past the 1st
+    // moves it to the previous month).
+    setMonthKey(occurredOn.slice(0, 7));
 
     await addTransaction({
       amount: parsedAmount,
       description: finalDesc,
       scope,
+      occurredOn,
       categoryId: selectedCategoryId ?? undefined,
     });
 
@@ -158,6 +173,7 @@ export default function BudgetScreen() {
     setBoughtQty(null);
     setAddToList(false);
     setEditingId(null);
+    setPickedDate(null);
   }
 
   // Load a transaction into the form to edit it (owner-only).
@@ -167,6 +183,7 @@ export default function BudgetScreen() {
     setDescription(tx.description ?? '');
     setScope(tx.scope);
     setCategoryId(tx.category_id);
+    setPickedDate(tx.occurred_on);
     setLinkedItemId(null);
     setAddToList(false);
   }
@@ -177,13 +194,16 @@ export default function BudgetScreen() {
     const selectedCategoryId = categoryId;
     const nextScope = scope;
     const nextDesc = trimmedDesc;
+    const occurredOn = formDate;
     resetForm();
+    setMonthKey(occurredOn.slice(0, 7));
     if (original) {
       await updateTransaction(original, {
         amount: parsedAmount,
         description: nextDesc,
         scope: nextScope,
         categoryId: selectedCategoryId,
+        occurredOn,
       });
     }
   }
@@ -244,7 +264,7 @@ export default function BudgetScreen() {
 
           <View style={styles.switcher}>
             <Pressable
-              onPress={() => setMonthKey(previousMonthKey(monthKey))}
+              onPress={() => goToMonth(previousMonthKey(monthKey))}
               accessibilityRole="button"
               accessibilityLabel={t('stats.prevMonth')}
               hitSlop={8}
@@ -253,7 +273,7 @@ export default function BudgetScreen() {
             </Pressable>
             <ThemedText style={styles.switchLabel}>{monthLong(monthKey, lang)}</ThemedText>
             <Pressable
-              onPress={() => setMonthKey(nextMonthKey(monthKey))}
+              onPress={() => goToMonth(nextMonthKey(monthKey))}
               disabled={isCurrentMonth}
               accessibilityRole="button"
               accessibilityState={{ disabled: isCurrentMonth }}
@@ -302,8 +322,8 @@ export default function BudgetScreen() {
               <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
             )}
 
-            {(isCurrentMonth || editingId) && (
-              <ThemedView type="backgroundElement" style={styles.addCard}>
+            {/* Shown on every month: past months add to that month (backdating). */}
+            <ThemedView type="backgroundElement" style={styles.addCard}>
               <View style={styles.amountRow}>
                 <TextInput
                   style={[styles.amountInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -327,6 +347,12 @@ export default function BudgetScreen() {
                 onChangeText={setDescription}
                 returnKeyType="done"
                 onSubmitEditing={editingId ? handleUpdate : handleAdd}
+              />
+
+              <DateField
+                date={formDate}
+                today={today}
+                onChange={setPickedDate}
               />
 
               {categories.length > 0 && (
@@ -393,8 +419,7 @@ export default function BudgetScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-              </ThemedView>
-            )}
+            </ThemedView>
 
             {error && (
               <Pressable
@@ -776,6 +801,73 @@ function ListLink({
   );
 }
 
+// The day an expense happened: Today by default, stepped back a day at a time
+// (‹ ›), with a quick way back to today. Coarse jumps go through the month
+// switcher above — a past month defaults to its last day. No native picker, so
+// it needs no new build dependency and looks the same everywhere.
+function DateField({
+  date,
+  today,
+  onChange,
+}: {
+  date: string;
+  today: string;
+  onChange: (day: string) => void;
+}) {
+  const theme = useTheme();
+  const { t, lang } = useTranslation();
+  const atToday = date >= today;
+  const label = dayLabel(date, today, lang);
+  return (
+    <View style={styles.dateRow}>
+      <ThemedText type="small" themeColor="textSecondary">
+        {t('budget.date')}
+      </ThemedText>
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => onChange(addDays(date, -1))}
+          accessibilityRole="button"
+          accessibilityLabel={t('budget.prevDay')}
+          hitSlop={6}
+          style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
+          <ThemedText style={styles.stepBtnText}>‹</ThemedText>
+        </Pressable>
+        <ThemedText
+          style={styles.dateValue}
+          testID="expense-date"
+          accessibilityLabel={t('budget.dateA11y', { date: label })}>
+          {label}
+        </ThemedText>
+        <Pressable
+          onPress={() => onChange(addDays(date, 1))}
+          disabled={atToday}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: atToday }}
+          accessibilityLabel={t('budget.nextDay')}
+          hitSlop={6}
+          style={({ pressed }) => [
+            styles.stepBtn,
+            { backgroundColor: theme.tint, opacity: atToday ? 0.35 : pressed ? 0.6 : 1 },
+          ]}>
+          <ThemedText style={styles.stepBtnText}>›</ThemedText>
+        </Pressable>
+      </View>
+      {date !== today && (
+        <Pressable
+          onPress={() => onChange(today)}
+          accessibilityRole="button"
+          accessibilityLabel={t('budget.backToToday')}
+          hitSlop={8}
+          style={({ pressed }) => pressed && styles.pressed}>
+          <ThemedText type="smallBold" style={styles.link}>
+            {t('budget.todayShort')}
+          </ThemedText>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 function TransactionRow({
   item,
   category,
@@ -868,6 +960,13 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   link: { color: Accent.primary },
   // Wraps to a second line on narrow screens / longer labels.
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  dateValue: { minWidth: 96, textAlign: 'center', fontWeight: '600' },
   navRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
