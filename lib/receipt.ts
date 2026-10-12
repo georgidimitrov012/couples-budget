@@ -1,4 +1,5 @@
 import { parseAmount } from './format';
+import { sameItem } from './groceries';
 
 export type ScannedItem = { name: string; quantity: number; price: number | null };
 export type ScanResult = {
@@ -72,7 +73,8 @@ export function matchListItem(
   let bestScore = 0;
   for (const item of items) {
     if (item.is_checked) continue; // already accounted for in the budget
-    const score = nameSimilarity(name, item.name);
+    // Same catalog item in another language ("Моркови" on the list, "carrots" scanned) is a sure match.
+    const score = sameItem(name, item.name) ? 1 : nameSimilarity(name, item.name);
     if (score > bestScore) {
       bestScore = score;
       best = { id: item.id, name: item.name };

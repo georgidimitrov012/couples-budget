@@ -506,3 +506,49 @@ describe('BudgetScreen', () => {
     expect(screen.queryByLabelText('Add expense')).toBeNull();
   });
 });
+
+// Regression: list items and expenses saved in Bulgarian stayed Bulgarian in
+// English, and "Carrots" didn't count as the listed "Моркови".
+describe('BudgetScreen — list items across languages', () => {
+  it('shows a Bulgarian-stored list item in English and uses that name for the expense', async () => {
+    const addTransaction = jest.fn().mockResolvedValue(undefined);
+    const completeItem = jest.fn().mockResolvedValue(undefined);
+    mockUseTransactions.mockReturnValue({ ...base, addTransaction });
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Моркови', category: 'produce' })],
+      completeItem,
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('0.00'), '2');
+    await user.press(screen.getByLabelText('List item: Carrots'));
+    await user.press(screen.getByLabelText('Add expense'));
+
+    expect(addTransaction).toHaveBeenCalledWith(expect.objectContaining({ description: 'Carrots' }));
+    expect(completeItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), 1);
+  });
+
+  it('does not offer "add to shopping list" for an item already listed in the other language', async () => {
+    mockUseListItems.mockReturnValue({
+      ...listBase,
+      items: [listItem({ id: 'i1', name: 'Моркови', category: 'produce' })],
+    });
+    const user = userEvent.setup();
+    await render(<BudgetScreen />);
+
+    await user.type(screen.getByPlaceholderText('What was it for? (optional)'), 'Carrots');
+    expect(screen.queryByLabelText('Also add to shopping list')).toBeNull();
+  });
+
+  it('shows a catalog-item expense in the viewer’s language, free text as typed', async () => {
+    mockUseTransactions.mockReturnValue({
+      ...base,
+      items: [tx({ id: 't1', description: 'Моркови' }), tx({ id: 't2', description: 'Домат' })],
+    });
+    await render(<BudgetScreen />);
+    expect(screen.getByText('Carrots')).toBeTruthy();
+    expect(screen.getByText('Домат')).toBeTruthy();
+  });
+});

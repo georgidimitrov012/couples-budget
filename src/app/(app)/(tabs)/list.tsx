@@ -24,8 +24,10 @@ import {
   categorize,
   categoryFor,
   COMMON_ITEMS,
+  displayItemName,
   GROCERY_CATEGORIES,
   itemSlug,
+  sameItem,
   type CommonItem,
   type GroceryCategory,
 } from '../../../../lib/groceries';
@@ -61,7 +63,7 @@ function buildSections(items: ListItem[]): Section[] {
 
 export default function ListScreen() {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { listId, loading: listLoading, error: listError, retry: retryList } = useShoppingList();
   const {
     items,
@@ -83,25 +85,26 @@ export default function ListScreen() {
   const canAdd = draft.trim().length > 0 && !!listId;
   const checkedCount = items.filter((i) => i.is_checked).length;
   const sections = useMemo(() => buildSections(items), [items]);
-  const activeNames = useMemo(
-    () => new Set(items.filter((i) => !i.is_checked).map((i) => i.name.toLowerCase())),
-    [items]
-  );
+  const activeItems = useMemo(() => items.filter((i) => !i.is_checked), [items]);
+  // An item already on the list, in either language ("Carrots" = "Моркови").
+  const findActive = (name: string) => activeItems.find((i) => sameItem(i.name, name));
 
   async function handleAdd() {
     if (!canAdd) return;
     const name = draft.trim();
     setDraft('');
-    await addItem(name, { category: categorize(name) });
+    // Typing something that's already listed bumps it instead of adding a twin.
+    const existing = findActive(name);
+    if (existing) await setQuantity(existing, existing.quantity + 1);
+    else await addItem(name, { category: categorize(name) });
   }
 
   // Adding a common item that's already on the list just bumps its quantity.
-  // We add the localized name so the list reads in the user's language.
+  // The name is stored in the adder's language; everyone sees it in their own
+  // (displayItemName), so mixing languages never mixes the list.
   function addCommon(common: CommonItem) {
     const label = t(`item.${itemSlug(common.name)}`);
-    const existing = items.find(
-      (i) => !i.is_checked && i.name.toLowerCase() === label.toLowerCase()
-    );
+    const existing = findActive(common.name);
     if (existing) setQuantity(existing, existing.quantity + 1);
     else addItem(label, { category: common.category });
   }
@@ -200,7 +203,7 @@ export default function ListScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.flex}>
             {showCatalog ? (
-              <Catalog activeNames={activeNames} onAdd={addCommon} />
+              <Catalog isListed={(c) => !!findActive(c.name)} onAdd={addCommon} />
             ) : loading ? (
               <View style={styles.center}>
                 <ActivityIndicator testID="list-loading" />
@@ -220,7 +223,7 @@ export default function ListScreen() {
                   </ThemedText>
                 )}
                 renderItem={({ item }) => {
-                  const deal = item.is_checked ? null : deals.saleFor(item.name); // [deals]
+                  const deal = item.is_checked ? null : deals.saleFor(displayItemName(item.name, lang)); // [deals]
                   return (
                     <ListRow
                       item={item}
@@ -241,10 +244,10 @@ export default function ListScreen() {
 }
 
 function Catalog({
-  activeNames,
+  isListed,
   onAdd,
 }: {
-  activeNames: Set<string>;
+  isListed: (item: CommonItem) => boolean;
   onAdd: (item: CommonItem) => void;
 }) {
   const theme = useTheme();
@@ -264,7 +267,7 @@ function Catalog({
             <View style={styles.chipWrap}>
               {options.map((common) => {
                 const label = t(`item.${itemSlug(common.name)}`);
-                const added = activeNames.has(label.toLowerCase());
+                const added = isListed(common);
                 return (
                   <Pressable
                     key={common.name}
@@ -309,7 +312,8 @@ function ListRow({
   footer?: ReactNode;
 }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const name = displayItemName(item.name, lang);
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <View style={styles.rowLine}>
@@ -317,7 +321,7 @@ function ListRow({
           onPress={onToggle}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: item.is_checked }}
-          accessibilityLabel={item.name}
+          accessibilityLabel={name}
           hitSlop={8}
           style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
           <View
@@ -332,7 +336,7 @@ function ListRow({
             themeColor={item.is_checked ? 'textSecondary' : 'text'}
             numberOfLines={1}
             style={[styles.itemName, item.is_checked && styles.itemNameChecked]}>
-            {item.name}
+            {name}
           </ThemedText>
         </Pressable>
 
@@ -342,7 +346,7 @@ function ListRow({
               onPress={() => onQuantity(item.quantity - 1)}
               disabled={item.quantity <= 1}
               accessibilityRole="button"
-              accessibilityLabel={t('list.decrease', { name: item.name })}
+              accessibilityLabel={t('list.decrease', { name })}
               hitSlop={6}
               style={({ pressed }) => [
                 styles.stepBtn,
@@ -354,7 +358,7 @@ function ListRow({
             <Pressable
               onPress={() => onQuantity(item.quantity + 1)}
               accessibilityRole="button"
-              accessibilityLabel={t('list.increase', { name: item.name })}
+              accessibilityLabel={t('list.increase', { name })}
               hitSlop={6}
               style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
               <ThemedText style={styles.stepBtnText}>＋</ThemedText>
@@ -365,7 +369,7 @@ function ListRow({
         <Pressable
           onPress={onRemove}
           accessibilityRole="button"
-          accessibilityLabel={t('list.remove', { name: item.name })}
+          accessibilityLabel={t('list.remove', { name })}
           hitSlop={8}
           style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
           <ThemedText type="small" themeColor="textSecondary">

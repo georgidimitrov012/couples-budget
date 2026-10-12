@@ -23,7 +23,7 @@ import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from
 import { useTheme } from '@/hooks/use-theme';
 import { budgetAlerts, budgetLevel, monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
-import { categorize } from '../../../../lib/groceries';
+import { categorize, displayItemName, sameItem } from '../../../../lib/groceries';
 import { monthLong } from '../../../../lib/month';
 import { monthKeyOf, nextMonthKey, previousMonthKey } from '../../../../lib/stats';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -82,13 +82,10 @@ export default function BudgetScreen() {
   const activeItems = useMemo(() => listItems.filter((i) => !i.is_checked), [listItems]);
   const linkedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
   const trimmedDesc = description.trim();
-  const activeNames = useMemo(
-    () => new Set(activeItems.map((i) => i.name.toLowerCase())),
-    [activeItems]
-  );
-  // Offer "also add to the list" only for a fresh off-list name (not one already listed).
+  // Offer "also add to the list" only for a fresh off-list name (not one already
+  // listed — in either language: "Carrots" is listed when "Моркови" is).
   const showAddToList =
-    !linkedItemId && trimmedDesc.length > 0 && !activeNames.has(trimmedDesc.toLowerCase());
+    !linkedItemId && trimmedDesc.length > 0 && !activeItems.some((i) => sameItem(i.name, trimmedDesc));
 
   function selectListItem(item: ListItem | null) {
     if (!item) {
@@ -98,7 +95,7 @@ export default function BudgetScreen() {
     setLinkedItemId(item.id);
     setBoughtQty(item.quantity);
     setAddToList(false);
-    if (!description.trim()) setDescription(item.name);
+    if (!description.trim()) setDescription(displayItemName(item.name, lang));
   }
 
   const monthItems = items.filter((t) => t.occurred_on.startsWith(monthKey));
@@ -121,7 +118,7 @@ export default function BudgetScreen() {
     if (parsedAmount == null) return;
     const selectedCategoryId = categoryId;
     const linked = linkedItem;
-    const finalDesc = trimmedDesc || linked?.name || '';
+    const finalDesc = trimmedDesc || (linked ? displayItemName(linked.name, lang) : '');
     const bought = boughtQty;
     const alsoAdd = showAddToList && addToList;
 
@@ -648,7 +645,7 @@ function ListLink({
   descLabel: string;
 }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   if (activeItems.length === 0 && !showAddToList) return null;
 
   return (
@@ -669,15 +666,18 @@ function ListLink({
               active={linkedItem === null}
               onPress={() => onSelect(null)}
             />
-            {activeItems.map((it) => (
-              <CategoryChip
-                key={it.id}
-                label={it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name}
-                accessibilityLabel={t('budget.listItem', { name: it.name })}
-                active={linkedItem?.id === it.id}
-                onPress={() => onSelect(it)}
-              />
-            ))}
+            {activeItems.map((it) => {
+              const name = displayItemName(it.name, lang);
+              return (
+                <CategoryChip
+                  key={it.id}
+                  label={it.quantity > 1 ? `${name} ×${it.quantity}` : name}
+                  accessibilityLabel={t('budget.listItem', { name })}
+                  active={linkedItem?.id === it.id}
+                  onPress={() => onSelect(it)}
+                />
+              );
+            })}
           </ScrollView>
         </>
       )}
@@ -757,9 +757,11 @@ function TransactionRow({
   onRemove: () => void;
   onEdit?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { format } = useCurrency();
-  const desc = item.description || t('budget.expense');
+  // An expense bought from the list carries the item's name; show catalog items
+  // in the viewer's language like the list does. Free text stays as typed.
+  const desc = item.description ? displayItemName(item.description, lang) : t('budget.expense');
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <View style={styles.rowMain}>

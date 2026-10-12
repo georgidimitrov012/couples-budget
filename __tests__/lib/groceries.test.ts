@@ -1,4 +1,14 @@
-import { categorize, categoryFor, CATEGORY_BY_KEY } from '../../lib/groceries';
+import {
+  catalogSlugOf,
+  categorize,
+  categoryFor,
+  CATEGORY_BY_KEY,
+  COMMON_ITEMS,
+  displayItemName,
+  itemSlug,
+  sameItem,
+} from '../../lib/groceries';
+import { translations } from '../../lib/i18n';
 
 describe('categorize', () => {
   it('matches a known catalog item exactly (case-insensitive)', () => {
@@ -32,5 +42,45 @@ describe('categoryFor', () => {
   it('falls back to "other" for null/unknown keys', () => {
     expect(categoryFor(null)).toBe(CATEGORY_BY_KEY.other);
     expect(categoryFor('nope')).toBe(CATEGORY_BY_KEY.other);
+  });
+});
+
+describe('catalog identity across languages', () => {
+  const langs = Object.keys(translations) as (keyof typeof translations)[];
+
+  it('every catalog item resolves to its own key from every language — no two items collide', () => {
+    for (const item of COMMON_ITEMS) {
+      const slug = itemSlug(item.name);
+      for (const lang of langs) {
+        const label = translations[lang][`item.${slug}`];
+        expect(label).toBeTruthy();
+        expect(catalogSlugOf(label, { exact: true })).toBe(slug);
+        expect(catalogSlugOf(label)).toBe(slug);
+      }
+      expect(catalogSlugOf(item.name)).toBe(slug);
+    }
+  });
+
+  it('shows a catalog item in the viewer’s language, whatever language stored it', () => {
+    expect(displayItemName('Моркови', 'en')).toBe('Carrots');
+    expect(displayItemName('Carrots', 'bg')).toBe('Моркови');
+    expect(displayItemName('carrots', 'en')).toBe('Carrots');
+    expect(displayItemName('Моркови', 'bg')).toBe('Моркови');
+  });
+
+  it('leaves the user’s own text exactly as typed', () => {
+    expect(displayItemName('Домат', 'en')).toBe('Домат'); // not the catalog spelling
+    expect(displayItemName('Моркови за супата', 'en')).toBe('Моркови за супата');
+    expect(displayItemName('Бира Загорка', 'en')).toBe('Бира Загорка');
+  });
+
+  it('treats the same item in either language, singular or plural, as the same item', () => {
+    expect(sameItem('Моркови', 'Carrots')).toBe(true);
+    expect(sameItem('Домат', 'Домати')).toBe(true);
+    expect(sameItem('tomato', 'Домати')).toBe(true);
+    expect(sameItem('Бира', 'бира')).toBe(true);
+    expect(sameItem('Моркови', 'Картофи')).toBe(false);
+    expect(sameItem('Мляко', 'Кисело мляко')).toBe(false);
+    expect(sameItem('', '')).toBe(false);
   });
 });
