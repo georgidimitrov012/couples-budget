@@ -73,6 +73,8 @@ with a 6-character invite code.
   (jest-expo + Testing Library, no network) under `__tests__/`; and
   **`pnpm test:security`** — the live RLS/penetration suite (`tests/security/`) that
   exercises the real Supabase security boundary. `pnpm test:all` runs both.
+- **UI changes also get a pass of [`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md) on a real
+  phone** (both languages) before merge — it walks the List ↔ Budget and BG ↔ EN joins.
 - **Run the entire collection (`pnpm test:all`) before every merge to `main`.** Do not
   merge with a red suite.
 - **Whenever you add or change code, add or update tests to match** — new screens/hooks
