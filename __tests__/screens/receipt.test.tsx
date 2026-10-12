@@ -2,6 +2,7 @@ import { render, screen, userEvent, waitFor } from '@testing-library/react-nativ
 
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
+  requestMediaLibraryPermissionsAsync: jest.fn(),
   launchCameraAsync: jest.fn(),
   launchImageLibraryAsync: jest.fn(),
 }));
@@ -40,7 +41,13 @@ const SCAN = {
   ],
 };
 
+const GRANTED = { granted: true, canAskAgain: true };
+
 beforeEach(() => {
+  // Both pickers ask for permission first. Re-set every run: clearMocks only
+  // clears calls, so a mockResolvedValue would otherwise leak between tests.
+  (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue(GRANTED);
+  (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue(GRANTED);
   (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
     canceled: false,
     assets: [{ base64: 'aGVsbG8=', uri: 'file://r.jpg', mimeType: 'image/jpeg' }],
@@ -60,6 +67,47 @@ describe('ReceiptScreen', () => {
     await render(<ReceiptScreen />);
     expect(screen.getByLabelText('Take photo')).toBeTruthy();
     expect(screen.getByLabelText('Choose from library')).toBeTruthy();
+  });
+
+  // AGENTS.md requires all three permission states. "Denied but askable" and
+  // "blocked, only Settings can undo it" need different advice — and the library
+  // picker previously asked for no permission at all.
+  it('explains a refused photo permission without opening the picker', async () => {
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+    const user = userEvent.setup();
+    await render(<ReceiptScreen />);
+    await user.press(screen.getByLabelText('Choose from library'));
+
+    expect(await screen.findByText(/Photo access is needed/i)).toBeTruthy();
+    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+  });
+
+  it('points at Settings when the photo permission is blocked for good', async () => {
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      granted: false,
+      canAskAgain: false,
+    });
+    const user = userEvent.setup();
+    await render(<ReceiptScreen />);
+    await user.press(screen.getByLabelText('Choose from library'));
+
+    expect(await screen.findByText(/Turn it on in Settings/i)).toBeTruthy();
+  });
+
+  it('explains a refused camera permission without opening the camera', async () => {
+    (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+    const user = userEvent.setup();
+    await render(<ReceiptScreen />);
+    await user.press(screen.getByLabelText('Take photo'));
+
+    expect(await screen.findByText(/Camera access is needed/i)).toBeTruthy();
+    expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
   });
 
   it('scans a picked photo and shows editable line items', async () => {

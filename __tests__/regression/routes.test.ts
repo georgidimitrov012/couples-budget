@@ -30,4 +30,21 @@ describe('route structure', () => {
     expect(files).toContain('settings.tsx');
     expect(files).toContain('stats.tsx');
   });
+
+  // Regression: receipt scanning was shelved by deleting its entry-point Link
+  // from the List tab (1ef1709). The screen, its route registration and the whole
+  // backend stayed in place, so nothing failed — the feature was simply invisible
+  // in the app for weeks. Existing-file checks can't catch that; a screen is only
+  // "shipped" if something navigates to it.
+  it('keeps a reachable entry point to the receipt scanner on the List tab', () => {
+    const list = fs.readFileSync(path.join(appDir, '(tabs)', 'list.tsx'), 'utf8');
+    expect(list).toMatch(/href=["']\/receipt["']/);
+  });
+
+  it('registers every (app)-level modal it links to in the stack', () => {
+    const layout = fs.readFileSync(path.join(appDir, '_layout.tsx'), 'utf8');
+    for (const route of ['categories', 'recurring', 'receipt', 'settings', 'stats']) {
+      expect(layout).toContain(`name="${route}"`);
+    }
+  });
 });

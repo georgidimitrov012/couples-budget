@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useHousehold } from './useHousehold';
+import { useTranslation } from './useTranslation';
 import type { LinePayload, ScanResult } from '../lib/receipt';
 
 type ImageInput = { base64: string; mimeType?: string };
@@ -30,6 +31,7 @@ function toBytes(base64: string): Uint8Array {
  */
 export function useReceiptScan() {
   const { household } = useHousehold();
+  const { t } = useTranslation();
   const householdId = household?.id ?? null;
   const [scanning, setScanning] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -43,14 +45,14 @@ export function useReceiptScan() {
         body: { image: image.base64, mediaType: image.mimeType ?? 'image/jpeg' },
       });
       if (error) {
-        setError('Could not read the receipt. Please try again.');
+        setError(t('receipt.scanFailed'));
         return null;
       }
       return data as ScanResult;
     } finally {
       setScanning(false);
     }
-  }, []);
+  }, [t]);
 
   const apply = useCallback(
     async (input: {
@@ -61,7 +63,7 @@ export function useReceiptScan() {
       lines: LinePayload[];
     }): Promise<boolean> => {
       if (!householdId) {
-        setError('No household.');
+        setError(t('receipt.noHousehold'));
         return false;
       }
       setApplying(true);
@@ -75,7 +77,7 @@ export function useReceiptScan() {
           upsert: false,
         });
       if (uploadError) {
-        setError(`Couldn't save the receipt image: ${uploadError.message}`);
+        setError(t('receipt.uploadFailed', { error: uploadError.message }));
         setApplying(false);
         return false;
       }
@@ -102,7 +104,7 @@ export function useReceiptScan() {
       setApplying(false);
       return true;
     },
-    [householdId]
+    [householdId, t]
   );
 
   return { scan, apply, scanning, applying, error };

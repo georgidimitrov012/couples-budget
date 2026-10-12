@@ -7,6 +7,7 @@
 // created via the admin API and fully deleted afterwards (clean + repeatable).
 // Otherwise it falls back to anon sign-ups (email confirmation must be OFF) and
 // prints the leftover test data to delete by hand.
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
@@ -63,6 +64,7 @@ async function authed(email) {
 
 const householdIds = [];
 const userIds = [];
+const storagePaths = []; // receipt photos this run uploaded (or tried to)
 
 async function main() {
   console.log(`=== RLS / penetration suite (${admin ? 'service-role, self-cleaning' : 'anon fallback, leaves data'}) ===`);
@@ -262,6 +264,67 @@ async function main() {
     : { data: [] };
   check('member (A) apply_receipt records the reviewed expense', (appliedTx.data?.length ?? 0) === 1, applied.error?.message ?? '');
 
+  // Receipt photos (storage). These are financial documents, and the bucket's
+  // policies are the only thing between them and other users. These checks did
+  // not exist when the `receipts` bucket went missing from the live project, so
+  // nothing noticed until a real scan failed to save ("Bucket not found").
+  const photo = `${hh.id}/sec-${ts}.jpg`;
+  storagePaths.push(photo);
+  const store = (client) => client.storage.from('receipts');
+  const jpeg = Buffer.from('sec-test-receipt');
+
+  const aUpload = await store(clientA).upload(photo, jpeg, { contentType: 'image/jpeg' });
+  check('member (A) can upload a receipt photo to their household folder', aUpload.error == null, aUpload.error?.message ?? '');
+
+  const bDownload = await store(clientB).download(photo);
+  check('co-member (B) can read the household receipt photo', bDownload.error == null, bDownload.error?.message ?? '');
+
+  const cDownload = await store(clientC).download(photo);
+  check("outsider (C) cannot read another household's receipt photo", cDownload.error != null, cDownload.error ? '' : 'C READ IT');
+
+  const anonDownload = await store(anon).download(photo);
+  check('unauthenticated cannot read a receipt photo', anonDownload.error != null, anonDownload.error ? '' : 'ANON READ IT');
+
+  const publicUrl = store(anon).getPublicUrl(photo).data.publicUrl;
+  const publicRes = await fetch(publicUrl);
+  check('receipts bucket is private (no public URL access)', !publicRes.ok, `HTTP ${publicRes.status}`);
+
+  const cPhoto = `${hh.id}/sec-c-${ts}.jpg`;
+  storagePaths.push(cPhoto);
+  const cUpload = await store(clientC).upload(cPhoto, jpeg, { contentType: 'image/jpeg' });
+  check("outsider (C) cannot upload into another household's folder", cUpload.error != null, cUpload.error?.message ?? 'NO ERROR');
+
+  // Existence has to be checked with list(), not download(): Supabase's edge
+  // caches a user's authenticated download for roughly a minute, so someone who
+  // fetched a photo keeps getting it back briefly after it's deleted. A
+  // download-based check here passed even when the file was gone, which made
+  // the "C cannot delete" check unable to fail. list() reads storage directly.
+  const exists = async (path) => {
+    const [folder, name] = path.split('/');
+    const { data } = await store(clientA).list(folder, { search: name });
+    return (data ?? []).some((o) => o.name === name);
+  };
+
+  // A refused delete returns no error, just an empty result, so confirm the
+  // file actually survived.
+  const cRemove = await store(clientC).remove([photo]);
+  const survived = await exists(photo);
+  check(
+    "outsider (C) cannot delete another household's receipt photo",
+    survived && (cRemove.data?.length ?? 0) === 0,
+    survived ? '' : 'C DELETED IT'
+  );
+
+  // The app deletes the uploaded photo when apply_receipt fails, so a member
+  // must be able to delete in their own folder.
+  const aRemove = await store(clientA).remove([photo]);
+  const removed = !(await exists(photo));
+  check(
+    "member (A) can delete their household's receipt photo (failed-apply cleanup)",
+    (aRemove.data?.length ?? 0) === 1 && removed,
+    aRemove.error?.message ?? (removed ? '' : 'STILL IN STORAGE')
+  );
+
   const fullJoin = await clientC.rpc('join_household', { p_code: hh.invite_code });
   check('cannot join a full (2-member) household', fullJoin.error != null, fullJoin.error?.message ?? 'NO ERROR');
 
@@ -423,12 +486,15 @@ async function main() {
 
 async function teardown() {
   if (admin) {
+    // Storage objects don't cascade with the household row, so remove them first.
+    if (storagePaths.length) await admin.storage.from('receipts').remove(storagePaths).catch(() => {});
     for (const id of householdIds) await admin.from('households').delete().eq('id', id);
     for (const uid of userIds) await admin.auth.admin.deleteUser(uid).catch(() => {});
     console.log('\nCleaned up all test data (service role).');
   } else if (emails.length) {
     console.log('\n No SUPABASE_SERVICE_ROLE_KEY set — delete test data manually:');
     console.log('  households:', householdIds.join(', ') || '(none)');
+    if (storagePaths.length) console.log('  receipts bucket objects:', storagePaths.join(', '));
     console.log('  users (Auth -> Users, search "sec-"):', emails.join(', '));
   }
 }

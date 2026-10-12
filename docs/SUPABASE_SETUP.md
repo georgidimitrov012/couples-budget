@@ -202,22 +202,49 @@ public.apply_receipt(...)` block (and its `grant execute`) from `schema.sql`.
 
 ### 6b. Private Storage bucket + RLS
 
-Dashboard → **Storage** → **New bucket** → name `receipts`, **Private** (uncheck public).
-Then in the SQL Editor add policies scoping objects to the household in the first path
-segment (`<household_id>/<receipt_id>.jpg`):
+Run this in the SQL Editor. It creates the private bucket and scopes every object to the
+household named in its first path segment (`<household_id>/<file>.jpg`). It is safe to
+re-run: the bucket insert is a no-op if it exists and each policy is dropped first.
 
 ```sql
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', false)
+on conflict (id) do nothing;
+
+drop policy if exists "receipts_read" on storage.objects;
 create policy "receipts_read" on storage.objects
   for select to authenticated using (
     bucket_id = 'receipts'
     and public.is_household_member(((storage.foldername(name))[1])::uuid)
   );
+
+drop policy if exists "receipts_write" on storage.objects;
 create policy "receipts_write" on storage.objects
   for insert to authenticated with check (
     bucket_id = 'receipts'
     and public.is_household_member(((storage.foldername(name))[1])::uuid)
   );
+
+-- The app deletes the uploaded photo when apply_receipt fails; without this
+-- policy that cleanup silently does nothing and orphans the image.
+drop policy if exists "receipts_delete" on storage.objects;
+create policy "receipts_delete" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'receipts'
+    and public.is_household_member(((storage.foldername(name))[1])::uuid)
+  );
 ```
+
+**Symptom if this is missing:** scanning works (that's the Edge Function), but saving fails with
+*"Снимката на бележката не беше запазена: Bucket not found"*. That is how we found the bucket
+had gone missing from the live project in Oct 2026, so `pnpm test:security` now checks it: upload
+and read for members, no read/upload/delete for outsiders or anonymous users, no public URL, and
+member delete.
+
+**Expect a short cache window after a delete.** Supabase's edge caches each user's authenticated
+download for roughly a minute, so someone who already opened a photo can keep fetching it briefly
+after it's deleted. Only people who already had access see it. To check whether an object exists,
+use `list()`, not `download()`.
 
 ### 6c. Edge Function + Anthropic key
 
