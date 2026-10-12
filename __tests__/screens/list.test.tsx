@@ -249,3 +249,28 @@ describe('ListScreen — items follow the viewer’s language', () => {
     expect(setQuantity).toHaveBeenCalledWith(listed, 2);
   });
 });
+
+// Regression: "Hide common items" read like a filter; people couldn't find the
+// way back to their list.
+describe('ListScreen — common items', () => {
+  it('has a clear Done button that counts what was added and returns to the list', async () => {
+    const addItem = jest.fn();
+    mockUseListItems.mockReturnValue({
+      ...noopItems,
+      items: [item({ id: 'i1', name: 'Milk' })],
+      addItem,
+    });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    await user.press(screen.getByLabelText('Browse common items'));
+    expect(screen.getByText(/Tap to add/)).toBeTruthy();
+    await user.press(screen.getByLabelText('Add Bread'));
+    await user.press(screen.getByLabelText('Add Eggs'));
+    expect(screen.getByText('2 added to your list')).toBeTruthy();
+
+    await user.press(screen.getByLabelText('Done, back to your list'));
+    expect(screen.getByText('Milk')).toBeTruthy();
+    expect(screen.getByLabelText('Browse common items')).toBeTruthy();
+  });
+});

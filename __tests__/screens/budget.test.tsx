@@ -605,3 +605,16 @@ describe('BudgetScreen — an expense ticks off the list item it names', () => {
     expect(screen.queryByTestId('auto-linked')).toBeNull();
   });
 });
+
+describe('BudgetScreen — header', () => {
+  // Regression: three links beside the title crushed "Бюджет" to "Бю / д…".
+  it('puts the sub-page links in their own row, not beside the title', async () => {
+    await render(<BudgetScreen />);
+    const title = screen.getByText('Budget');
+    for (const label of ['Statistics', 'Manage categories', 'Recurring']) {
+      const link = screen.getByLabelText(label);
+      // Not inside the title row.
+      expect(link.parent).not.toBe(title.parent);
+    }
+  });
+});

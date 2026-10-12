@@ -194,16 +194,21 @@ export default function BudgetScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.inner}>
-          <ScreenHeader title={t('budget.title')}>
-            <View style={styles.headerLinks}>
+          <ScreenHeader title={t('budget.title')} />
+          {/* The screen's sub-pages get their own row: three links beside the title
+              left it no room in Bulgarian ("Бю / д…"). */}
+          <View style={styles.navRow}>
               <Link href="/stats" asChild>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('stats.title')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('stats.title')}
+                    📊 {t('stats.title')}
                   </ThemedText>
                 </Pressable>
               </Link>
@@ -211,10 +216,13 @@ export default function BudgetScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('budget.manageCategories')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('budget.categories')}
+                    🏷️ {t('budget.categories')}
                   </ThemedText>
                 </Pressable>
               </Link>
@@ -222,15 +230,17 @@ export default function BudgetScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('recurring.title')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('budget.recurring')}
+                    🔁 {t('budget.recurring')}
                   </ThemedText>
                 </Pressable>
               </Link>
-            </View>
-          </ScreenHeader>
+          </View>
 
           <View style={styles.switcher}>
             <Pressable
@@ -857,15 +867,17 @@ const styles = StyleSheet.create({
   // content padding so the list can scroll fully clear of the native tab bar.
   scroll: { flex: 1 },
   link: { color: Accent.primary },
-  // Wraps to a second line on narrow screens / longer (Bulgarian) labels rather
-  // than squeezing the title off-screen.
-  headerLinks: {
+  // Wraps to a second line on narrow screens / longer labels.
+  navRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: Spacing.three,
-    alignItems: 'center',
-    flexShrink: 1,
+    gap: Spacing.two,
+    paddingBottom: Spacing.three,
+  },
+  navPill: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.pill,
   },
   switcher: {
     flexDirection: 'row',

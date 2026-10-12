@@ -1,7 +1,8 @@
 import { Link } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -78,6 +79,9 @@ export default function ListScreen() {
   } = useListItems(listId);
   const [draft, setDraft] = useState('');
   const [showCatalog, setShowCatalog] = useState(false);
+  // How many items were added since the catalog opened — shown on its Done button
+  // so it's obvious the taps landed on the list.
+  const [addedFromCatalog, setAddedFromCatalog] = useState(0);
   const deals = useDeals(items); // [deals]
 
   const error = listError ?? itemsError;
@@ -107,7 +111,23 @@ export default function ListScreen() {
     const existing = findActive(common.name);
     if (existing) setQuantity(existing, existing.quantity + 1);
     else addItem(label, { category: common.category });
+    setAddedFromCatalog((n) => n + 1);
   }
+
+  function openCatalog() {
+    setAddedFromCatalog(0);
+    setShowCatalog(true);
+  }
+
+  // The Android back button leaves the catalog, like any other sub-screen.
+  useEffect(() => {
+    if (!showCatalog) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setShowCatalog(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [showCatalog]);
 
   function handleRetry() {
     retryList();
@@ -175,29 +195,52 @@ export default function ListScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.quickRow}>
-            <Pressable
-              onPress={() => setShowCatalog((s) => !s)}
-              accessibilityRole="button"
-              accessibilityLabel={t('list.browseCommon')}
-              style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
-              <ThemedText type="smallBold" style={styles.catalogToggleText}>
-                {showCatalog ? t('list.hideCommon') : t('list.commonItems')}
-              </ThemedText>
-            </Pressable>
-
-            <Link href="/receipt" asChild>
+          {showCatalog ? (
+            // While browsing, the way back is a real button, not a toggle that
+            // reads like a filter ("Hide common items" took people 10+ s to find).
+            <View style={styles.catalogBar}>
+              <View style={styles.flexShrink}>
+                <ThemedText type="smallBold">{t('list.commonTitle')}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {addedFromCatalog > 0
+                    ? t('list.addedCount', { count: addedFromCatalog })
+                    : t('list.commonHint')}
+                </ThemedText>
+              </View>
               <Pressable
+                onPress={() => setShowCatalog(false)}
                 accessibilityRole="button"
-                accessibilityLabel={t('receipt.title')}
-                hitSlop={8}
-                style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
-                <ThemedText type="smallBold" style={styles.scanLink}>
-                  {t('receipt.scanLink')}
+                accessibilityLabel={t('list.backToList')}
+                style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}>
+                <ThemedText type="smallBold" style={styles.doneButtonText}>
+                  {t('list.doneCommon')}
                 </ThemedText>
               </Pressable>
-            </Link>
-          </View>
+            </View>
+          ) : (
+            <View style={styles.quickRow}>
+              <Pressable
+                onPress={openCatalog}
+                accessibilityRole="button"
+                accessibilityLabel={t('list.browseCommon')}
+                style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
+                <ThemedText type="smallBold" style={styles.catalogToggleText}>
+                  {t('list.commonItems')}
+                </ThemedText>
+              </Pressable>
+              <Link href="/receipt" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('receipt.title')}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.catalogToggle, pressed && styles.pressed]}>
+                  <ThemedText type="smallBold" style={styles.scanLink}>
+                    {t('receipt.scanLink')}
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            </View>
+          )}
 
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -420,6 +463,21 @@ const styles = StyleSheet.create({
     ...Shadow.card,
   },
   addButtonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 26, lineHeight: 30 },
+  catalogBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    marginBottom: Spacing.one,
+  },
+  flexShrink: { flexShrink: 1 },
+  doneButton: {
+    backgroundColor: Accent.primary,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+  },
+  doneButtonText: { color: '#fff' },
   catalogToggle: { paddingVertical: Spacing.two, marginBottom: Spacing.one },
   catalogToggleText: { color: Accent.primary },
   // "Common items" on the left, "Scan receipt" on the right; wraps rather than
