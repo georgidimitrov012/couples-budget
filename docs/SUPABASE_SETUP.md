@@ -642,3 +642,30 @@ grant execute on function public.replace_deal_prices(text, date, jsonb) to servi
 The switch starts **off**. Turning it on/off, the GitHub secrets for the job and running it are
 in [`docs/DEALS.md`](DEALS.md). After applying, run `pnpm test:security` — the deals checks
 (clients can't write prices or flip the switch; members see prices only while it's on) should pass.
+
+## 16. Password reset — email a code, not a link
+
+The app's **Forgot password?** screen (`src/app/(auth)/forgot-password.tsx`) asks for a
+one-time **code** from the email and the new password together (`verifyOtp` type
+`recovery` → `updateUser`). A code needs no deep link or redirect URL, so it works the same
+in every build. Supabase's default reset email only has a link, so add the code:
+
+1. Dashboard → **Authentication → Emails → Templates → Reset Password**.
+2. Subject: `Код за смяна на паролата / Password reset code`
+3. Body (keep it short; both languages):
+
+   ```html
+   <h2>Смяна на парола / Password reset</h2>
+   <p>Твоят код / Your code: <strong style="font-size:22px;letter-spacing:3px">{{ .Token }}</strong></p>
+   <p>Въведи го в приложението. Ако не си искал(а) смяна, игнорирай този имейл.<br>
+   Enter it in the app. If you didn't ask for this, ignore this email.</p>
+   ```
+4. Save. (The code expires after the **Email OTP expiration** in Authentication → Providers →
+   Email, default 1 hour. Its length — 6 by default — is set there too; the app accepts any.)
+
+**Email sending limits.** Supabase's built-in mailer is for testing only: a few emails per hour,
+from a shared sender. Before launch, connect a real provider (Authentication → Emails → **SMTP
+Settings** — e.g. Resend, free tier) and raise the rate limit (Authentication → Rate Limits).
+The same applies if you later turn **Confirm email** back on (§3) — that's the step that stops
+someone signing up with an address they don't own.
+

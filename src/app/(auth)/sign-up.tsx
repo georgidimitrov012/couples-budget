@@ -15,10 +15,15 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  authErrorProblem,
+  MIN_PASSWORD_LENGTH,
+  normalizeEmail,
+  signUpProblem,
+  type Problem,
+} from '../../../lib/auth-validation';
 import { supabase } from '../../../lib/supabase';
 import { useTranslation } from '../../../hooks/useTranslation';
-
-const MIN_PASSWORD_LENGTH = 6;
 
 export default function SignUpScreen() {
   const theme = useTheme();
@@ -26,34 +31,32 @@ export default function SignUpScreen() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const error = problem ? t(problem.key, problem.params) : null;
   // Set when the project requires email confirmation: signUp returns no session.
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
   async function handleSignUp() {
     if (loading) return;
-    setError(null);
-    if (!email.trim() || !password) {
-      setError(t('error.enterCreds'));
-      return;
-    }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(t('error.passwordShort', { min: MIN_PASSWORD_LENGTH }));
-      return;
-    }
+    const invalid = signUpProblem({ name: displayName, email, password, confirm });
+    setProblem(invalid);
+    if (invalid) return;
 
     setLoading(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: normalizeEmail(email),
       password,
       // Seeds public.profiles.display_name via the on_auth_user_created trigger.
-      options: { data: { display_name: displayName.trim() || undefined } },
+      options: { data: { display_name: displayName.trim() } },
     });
     setLoading(false);
 
+    // A second sign-up with the same email is refused by Supabase
+    // ("user_already_exists") and shown as "an account already exists".
     if (signUpError) {
-      setError(signUpError.message);
+      setProblem(authErrorProblem(signUpError));
       return;
     }
     // If email confirmation is enabled, there's no session yet — the user must
@@ -80,7 +83,7 @@ export default function SignUpScreen() {
           <View style={[styles.form, styles.centered]}>
             <ThemedText type="subtitle">{t('signup.checkTitle')}</ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.centerText}>
-              {t('signup.checkBody', { email: email.trim() })}
+              {t('signup.checkBody', { email: normalizeEmail(email) })}
             </ThemedText>
             <Link href="/sign-in" asChild>
               <Pressable style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}>
@@ -140,9 +143,24 @@ export default function SignUpScreen() {
                 value={password}
                 onChangeText={setPassword}
                 editable={!loading}
+                returnKeyType="next"
+              />
+              <TextInput
+                style={inputStyle}
+                placeholder={t('field.confirmPassword')}
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                autoComplete="new-password"
+                secureTextEntry
+                value={confirm}
+                onChangeText={setConfirm}
+                editable={!loading}
                 returnKeyType="go"
                 onSubmitEditing={handleSignUp}
               />
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('signup.passwordHint', { min: MIN_PASSWORD_LENGTH })}
+              </ThemedText>
             </View>
 
             {error && (
