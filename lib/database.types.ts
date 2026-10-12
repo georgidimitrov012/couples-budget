@@ -58,6 +58,57 @@ export type Database = {
           },
         ]
       }
+      deal_prices: {
+        Row: {
+          chain: string
+          group_code: number
+          price_date: string
+          product_code: string
+          product_name: string
+          promo_price: number | null
+          promo_share: number
+          retail_price: number
+        }
+        Insert: {
+          chain: string
+          group_code: number
+          price_date: string
+          product_code: string
+          product_name: string
+          promo_price?: number | null
+          promo_share?: number
+          retail_price: number
+        }
+        Update: {
+          chain?: string
+          group_code?: number
+          price_date?: string
+          product_code?: string
+          product_name?: string
+          promo_price?: number | null
+          promo_share?: number
+          retail_price?: number
+        }
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recurring_rules: {
         Row: {
           amount: number
@@ -497,6 +548,10 @@ export type Database = {
         }
       }
       leave_household: { Args: never; Returns: undefined }
+      replace_deal_prices: {
+        Args: { p_chain: string; p_price_date: string; p_rows: Json }
+        Returns: number
+      }
       regenerate_invite_code: {
         Args: never
         Returns: {

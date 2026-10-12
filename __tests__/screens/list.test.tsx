@@ -6,6 +6,18 @@ jest.mock('../../hooks/useShoppingList', () => ({ useShoppingList: () => mockUse
 jest.mock('../../hooks/useListItems', () => ({
   useListItems: (...a: unknown[]) => mockUseListItems(...a),
 }));
+// The deals feature is tested on its own (__tests__/features/deals); here we only
+// check the List tab's one hook-in point.
+const mockSaleFor = jest.fn();
+jest.mock('@/features/deals', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    useDeals: () => ({ saleFor: (name: string) => mockSaleFor(name) }),
+    DealBadge: ({ deal }: { deal: { best: { chain: string } } }) =>
+      React.createElement(Text, null, `deal at ${deal.best.chain}`),
+  };
+});
 
 import ListScreen from '../../src/app/(app)/(tabs)/list';
 
@@ -48,6 +60,7 @@ const noopItems = {
 beforeEach(() => {
   mockUseShoppingList.mockReturnValue({ listId: 'L1', loading: false, error: null, retry: jest.fn() });
   mockUseListItems.mockReturnValue({ ...noopItems });
+  mockSaleFor.mockReturnValue(null);
 });
 
 describe('ListScreen', () => {
@@ -169,5 +182,23 @@ describe('ListScreen', () => {
     await user.press(screen.getByLabelText('Retry'));
     expect(listRetry).toHaveBeenCalled();
     expect(itemsRetry).toHaveBeenCalled();
+  });
+
+  it('shows a deal badge under an item that is on sale, never under a checked one', async () => {
+    mockSaleFor.mockImplementation((name: string) =>
+      name === 'Tomatoes' || name === 'Eggs' ? { best: { chain: name === 'Tomatoes' ? 'lidl' : 'billa' } } : null
+    );
+    mockUseListItems.mockReturnValue({
+      ...noopItems,
+      items: [
+        item({ id: 'i1', name: 'Tomatoes', category: 'produce' }),
+        item({ id: 'i2', name: 'Bread', category: 'bakery' }),
+        item({ id: 'i3', name: 'Eggs', category: 'dairy', is_checked: true }),
+      ],
+    });
+    await render(<ListScreen />);
+    expect(screen.getByText('deal at lidl')).toBeTruthy();
+    expect(screen.queryByText('deal at billa')).toBeNull();
+    expect(mockSaleFor).not.toHaveBeenCalledWith('Eggs');
   });
 });

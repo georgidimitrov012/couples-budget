@@ -1,0 +1,51 @@
+name: Deals — refresh prices
+
+# [deals] Removable feature — see docs/DEALS.md.
+#
+# Downloads the КЗП "Колко струва" open-data archive and loads today's prices for
+# Lidl, Kaufland, Billa, Fantastico and T Market into Supabase. Does nothing while
+# the deals switch (feature_flags "deals") is off.
+#
+# DEVELOPMENT: manual only — Actions → "Deals — refresh prices" → Run workflow.
+# AT LAUNCH: uncomment the schedule below (one daily run after the chains report).
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Price date (YYYY-MM-DD). Leave empty for the newest archive.'
+        required: false
+        default: ''
+  # schedule:
+  #   - cron: '30 6 * * *' # 06:30 UTC ≈ 09:30 Sofia, after the 07:00 reporting deadline
+
+concurrency:
+  group: deals-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Load supermarket prices
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        # Node 24 runs the TypeScript parser directly (type stripping), so the job
+        # needs no dependency install at all.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Load prices
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEALS_DATE: ${{ inputs.date }}
+        run: >-
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning
+          src/features/deals/ingest/run.mjs

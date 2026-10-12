@@ -44,6 +44,9 @@ with a 6-character invite code.
 - Always handle the three permission states (not asked / denied / granted) and the
   offline state gracefully (banner + retry).
 - Every list/data screen needs explicit empty, loading, and error states.
+- **Supermarket deals** (`src/features/deals/`) is a self-contained, *removable* feature with a
+  remote on/off switch. Keep all of its code in that folder; the rest of the app touches it only
+  from the List tab via `@/features/deals` (a regression test enforces this). See `docs/DEALS.md`.
 
 ## Don'ts
 - Don't eject from the Expo managed workflow.

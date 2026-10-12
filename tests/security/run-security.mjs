@@ -65,6 +65,7 @@ async function authed(email) {
 const householdIds = [];
 const userIds = [];
 const storagePaths = []; // receipt photos this run uploaded (or tried to)
+let dealSentinel = null; // deal_prices row seeded by the deals checks
 
 async function main() {
   console.log(`=== RLS / penetration suite (${admin ? 'service-role, self-cleaning' : 'anon fallback, leaves data'}) ===`);
@@ -406,6 +407,52 @@ async function main() {
   const cronCall = await clientA.rpc('apply_due_recurring');
   check('client cannot call apply_due_recurring (scheduled job only)', cronCall.error != null, cronCall.error?.message ?? 'NO ERROR');
 
+  // --- supermarket deals (removable feature, docs/DEALS.md) ---------------
+  // Prices are written only by the ingest job (service role). Clients can read
+  // them only while the 'deals' switch is on, and can never flip the switch.
+  const flagInsert = await clientA.from('feature_flags').insert({ key: `sec-${ts}`, enabled: true });
+  check('client cannot create feature flags', flagInsert.error != null, flagInsert.error?.message ?? 'NO ERROR');
+
+  const flagFlip = await clientA.from('feature_flags').update({ enabled: true }).eq('key', 'deals').select();
+  check('client cannot flip the deals switch', (flagFlip.data?.length ?? 0) === 0, JSON.stringify(flagFlip.data));
+
+  const dealInsert = await clientA.from('deal_prices').insert({
+    chain: 'lidl', product_code: `sec-${ts}`, product_name: 'x', group_code: 54, retail_price: 1, price_date: '2000-01-01',
+  });
+  check('client cannot write deal prices', dealInsert.error != null, dealInsert.error?.message ?? 'NO ERROR');
+
+  // A made-up chain: even if this RPC were wrongly exposed, it would only clear
+  // rows that don't exist.
+  const replaceCall = await clientA.rpc('replace_deal_prices', { p_chain: `sec-${ts}`, p_price_date: '2000-01-01', p_rows: [] });
+  check('client cannot call replace_deal_prices (ingest job only)', replaceCall.error != null, replaceCall.error?.message ?? 'NO ERROR');
+
+  if (admin) {
+    // A sentinel price row (dated 2000, so the app's freshness filter hides it).
+    dealSentinel = `sec-${ts}`;
+    const seed = await admin.from('deal_prices').insert({
+      chain: 'lidl', product_code: dealSentinel, product_name: 'sec sentinel', group_code: 54, retail_price: 1, price_date: '2000-01-01',
+    });
+    if (seed.error) throw new Error('seed deal_prices: ' + seed.error.message);
+
+    const { data: flag } = await admin.from('feature_flags').select('enabled').eq('key', 'deals').maybeSingle();
+    const memberRead = await clientA.from('deal_prices').select('product_code').eq('product_code', dealSentinel);
+    if (flag?.enabled) check('deals switch ON → members can read prices', (memberRead.data?.length ?? 0) === 1);
+    else check('deals switch OFF → members see no prices', (memberRead.data?.length ?? 0) === 0);
+
+    const anonRead = await mkClient(anonKey).from('deal_prices').select('product_code').eq('product_code', dealSentinel);
+    check('unauthenticated cannot read deal prices', (anonRead.data?.length ?? 0) === 0);
+
+    const memberEdit = await clientA.from('deal_prices').update({ retail_price: 0.01 }).eq('product_code', dealSentinel).select();
+    check('client cannot edit deal prices', (memberEdit.data?.length ?? 0) === 0);
+
+    await clientA.from('deal_prices').delete().eq('product_code', dealSentinel);
+    const stillThere = await admin.from('deal_prices').select('retail_price').eq('product_code', dealSentinel);
+    check('client cannot delete deal prices', stillThere.data?.[0]?.retail_price === 1, JSON.stringify(stillThere.data));
+  } else {
+    const anonRead = await mkClient(anonKey).from('deal_prices').select('product_code').limit(1);
+    check('unauthenticated cannot read deal prices', (anonRead.data?.length ?? 0) === 0);
+  }
+
   // --- leave-household / account deletion --------------------------------
   // These are destructive, so they run last against their own fresh households.
 
@@ -488,6 +535,7 @@ async function teardown() {
   if (admin) {
     // Storage objects don't cascade with the household row, so remove them first.
     if (storagePaths.length) await admin.storage.from('receipts').remove(storagePaths).catch(() => {});
+    if (dealSentinel) await admin.from('deal_prices').delete().eq('product_code', dealSentinel);
     for (const id of householdIds) await admin.from('households').delete().eq('id', id);
     for (const uid of userIds) await admin.auth.admin.deleteUser(uid).catch(() => {});
     console.log('\nCleaned up all test data (service role).');
