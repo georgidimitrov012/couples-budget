@@ -63,7 +63,8 @@ export function categoryFor(key: string | null | undefined): GroceryCategory {
 export type CommonItem = { name: string; category: GroceryCategoryKey };
 
 // A catalog of everyday items, tappable to add with the right category already
-// set. Names are English; Phase 4 will localize them.
+// set. `name` is the English source; the label shown is `item.<slug>` in the
+// viewer's language (see displayItemName below).
 export const COMMON_ITEMS: CommonItem[] = [
   // Dairy & eggs
   { name: 'Milk', category: 'dairy' },
@@ -138,6 +139,127 @@ const COMMON_BY_NAME: Record<string, GroceryCategoryKey> = (() => {
   }
   return map;
 })();
+
+// ---------------------------------------------------------------------------
+// Catalog identity across languages.
+//
+// A list item is stored as plain text, in whatever language its author used
+// ("Моркови" or "Carrots"). Names are never translated in the database; instead
+// the UI recognises a catalog item in EITHER language and shows it in the
+// viewer's language, and comparisons ("is this already on the list?", "which
+// list item did this expense buy?") go by catalog key, not by text. That keeps
+// old rows, rows from a partner using the other language, and older app
+// versions all working without a migration.
+
+type Lang = keyof typeof translations;
+
+function normalizeItemName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+// Plural / definite-article endings, so "Домат"/"Домати"/"Доматите" and
+// "Tomato"/"Tomatoes" fold together. Only used for matching, never displayed.
+const BG_ENDINGS = ['ите', 'ата', 'ото', 'ове', 'ета', 'ът', 'ят', 'и', 'а', 'я', 'е', 'о'];
+
+function stemWord(word: string): string {
+  if (/^[a-z]+$/.test(word)) {
+    if (word.length > 4 && word.endsWith('oes')) return word.slice(0, -2);
+    if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+    return word;
+  }
+  for (const end of BG_ENDINGS) {
+    if (word.endsWith(end) && word.length - end.length >= 3) return word.slice(0, -end.length);
+  }
+  return word;
+}
+
+function looseForm(name: string): string {
+  return normalizeItemName(name).split(' ').map(stemWord).join(' ');
+}
+
+const SLUG_BY_EXACT = new Map<string, string>();
+const SLUG_BY_LOOSE = new Map<string, string>();
+for (const item of COMMON_ITEMS) {
+  const slug = itemSlug(item.name);
+  for (const lang of Object.keys(translations) as Lang[]) {
+    const label = translations[lang][`item.${slug}`];
+    if (!label) continue;
+    SLUG_BY_EXACT.set(normalizeItemName(label), slug);
+    SLUG_BY_LOOSE.set(looseForm(label), slug);
+  }
+  SLUG_BY_EXACT.set(normalizeItemName(item.name), slug);
+  SLUG_BY_LOOSE.set(looseForm(item.name), slug);
+}
+
+/**
+ * The catalog item a name refers to, in either language, or null for free text.
+ * `exact` only accepts the catalog spelling itself (any case); otherwise
+ * singular/plural/article forms count too ("Домат" → tomatoes).
+ */
+export function catalogSlugOf(name: string, { exact = false } = {}): string | null {
+  const hit = SLUG_BY_EXACT.get(normalizeItemName(name));
+  if (hit || exact) return hit ?? null;
+  return SLUG_BY_LOOSE.get(looseForm(name)) ?? null;
+}
+
+/**
+ * How to show a stored item name to someone using `lang`: a catalog item is shown
+ * in their language ("Carrots" reads "Моркови" in Bulgarian); anything else is
+ * the user's own text and is shown exactly as typed.
+ */
+export function displayItemName(name: string, lang: Lang): string {
+  const slug = catalogSlugOf(name, { exact: true });
+  return (slug && translations[lang][`item.${slug}`]) || name;
+}
+
+/** Do two names mean the same item? Same catalog item in any language, or the same text. */
+export function sameItem(a: string, b: string): boolean {
+  const ka = catalogSlugOf(a);
+  if (ka && ka === catalogSlugOf(b)) return true;
+  const na = looseForm(a);
+  return na.length > 0 && na === looseForm(b);
+}
+
+/**
+ * The still-needed list item an expense description is about, or null. Exact
+ * item first ("Carrots" ↔ "Моркови"), then a description that contains the
+ * item's words ("Моркови 2кг", "морков от пазара") or a catalog word that is the
+ * item ("2 kg carrots" ↔ "Моркови"). Ambiguous hits (two items) return null —
+ * the user can still pick by hand.
+ */
+export function findListMatch<T extends { name: string; is_checked: boolean }>(
+  description: string,
+  items: T[]
+): T | null {
+  const active = items.filter((i) => !i.is_checked);
+  if (!normalizeItemName(description)) return null;
+  const exact = active.filter((i) => sameItem(i.name, description));
+  if (exact.length > 0) return exact.length === 1 ? exact[0] : null;
+
+  // A description that is itself a catalog item only ever means that item
+  // ("Кисело мляко" is yogurt, never the listed "Мляко").
+  if (catalogSlugOf(description)) return null;
+
+  const words = looseForm(description).split(' ');
+  const wordSlugs = new Set(
+    normalizeItemName(description)
+      .split(' ')
+      .map((w) => catalogSlugOf(w))
+      .filter((s): s is string => !!s)
+  );
+  const hits = active.filter((i) => {
+    const itemWords = looseForm(i.name).split(' ');
+    if (itemWords.length > 0 && itemWords.every((w) => words.includes(w))) return true;
+    const slug = catalogSlugOf(i.name);
+    return !!slug && wordSlugs.has(slug);
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
 
 /**
  * Best-effort category for a free-typed item: an exact catalog match first,

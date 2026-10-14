@@ -47,3 +47,6 @@ example
 
 .env
 .env.local
+
+# Jest coverage reports
+coverage/

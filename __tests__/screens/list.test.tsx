@@ -202,3 +202,75 @@ describe('ListScreen', () => {
     expect(mockSaleFor).not.toHaveBeenCalledWith('Eggs');
   });
 });
+
+// Regression: items added in Bulgarian stayed Bulgarian after switching to
+// English, so the list mixed languages and "Carrots" duplicated "Моркови".
+describe('ListScreen — items follow the viewer’s language', () => {
+  it('shows a catalog item stored in Bulgarian in English, and free text as typed', async () => {
+    mockUseListItems.mockReturnValue({
+      ...noopItems,
+      items: [
+        item({ id: 'i1', name: 'Моркови', category: 'produce' }),
+        item({ id: 'i2', name: 'Домат за салата', category: 'produce' }),
+      ],
+    });
+    await render(<ListScreen />);
+    expect(screen.getByText('Carrots')).toBeTruthy();
+    expect(screen.queryByText('Моркови')).toBeNull();
+    expect(screen.getByText('Домат за салата')).toBeTruthy();
+  });
+
+  it('typing an item that is already listed in the other language bumps it instead of adding a twin', async () => {
+    const addItem = jest.fn();
+    const setQuantity = jest.fn().mockResolvedValue(undefined);
+    const listed = item({ id: 'i1', name: 'Моркови', category: 'produce', quantity: 1 });
+    mockUseListItems.mockReturnValue({ ...noopItems, items: [listed], addItem, setQuantity });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    await user.type(screen.getByPlaceholderText('Add an item…'), 'carrots');
+    await user.press(screen.getByLabelText('Add item'));
+    expect(addItem).not.toHaveBeenCalled();
+    expect(setQuantity).toHaveBeenCalledWith(listed, 2);
+  });
+
+  it('the catalog marks an item listed in the other language and bumps it', async () => {
+    const addItem = jest.fn();
+    const setQuantity = jest.fn();
+    const listed = item({ id: 'i1', name: 'Моркови', category: 'produce', quantity: 1 });
+    mockUseListItems.mockReturnValue({ ...noopItems, items: [listed], addItem, setQuantity });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    await user.press(screen.getByLabelText('Browse common items'));
+    expect(screen.getByText(/✓ Carrots/)).toBeTruthy();
+    await user.press(screen.getByLabelText('Add Carrots'));
+    expect(addItem).not.toHaveBeenCalled();
+    expect(setQuantity).toHaveBeenCalledWith(listed, 2);
+  });
+});
+
+// Regression: "Hide common items" read like a filter; people couldn't find the
+// way back to their list.
+describe('ListScreen — common items', () => {
+  it('has a clear Done button that counts what was added and returns to the list', async () => {
+    const addItem = jest.fn();
+    mockUseListItems.mockReturnValue({
+      ...noopItems,
+      items: [item({ id: 'i1', name: 'Milk' })],
+      addItem,
+    });
+    const user = userEvent.setup();
+    await render(<ListScreen />);
+
+    await user.press(screen.getByLabelText('Browse common items'));
+    expect(screen.getByText(/Tap to add/)).toBeTruthy();
+    await user.press(screen.getByLabelText('Add Bread'));
+    await user.press(screen.getByLabelText('Add Eggs'));
+    expect(screen.getByText('2 added to your list')).toBeTruthy();
+
+    await user.press(screen.getByLabelText('Done, back to your list'));
+    expect(screen.getByText('Milk')).toBeTruthy();
+    expect(screen.getByLabelText('Browse common items')).toBeTruthy();
+  });
+});

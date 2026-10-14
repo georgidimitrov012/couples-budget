@@ -200,6 +200,19 @@ describe('useTransactions', () => {
     );
   });
 
+  it('moves an expense to another day when its date is edited', async () => {
+    results.select = { data: [tx({ id: 't1', occurred_on: '2026-07-01' })], error: null };
+    const { result } = await renderHook(() => useTransactions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateTransaction(result.current.items[0], { occurredOn: '2026-06-20' });
+    });
+
+    expect(result.current.items.find((t) => t.id === 't1')?.occurred_on).toBe('2026-06-20');
+    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ occurred_on: '2026-06-20' }));
+  });
+
   it('rolls back an update and surfaces the error when the write fails', async () => {
     results.select = { data: [tx({ id: 't1', amount: 10, description: 'Old' })], error: null };
     results.update = { error: { message: 'update denied' } };

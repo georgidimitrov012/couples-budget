@@ -90,6 +90,11 @@ GitHub Actions (manual for now)                     Supabase                    
   stores, the most common promo price, and the **share of stores** that report the promo.
 - "On sale at Kaufland" means the promo is in **at least 80 %** of that chain's stores. A promo in
   only a few stores shows in the sheet as "само в някои магазини", never as the badge.
+- The badge also needs **at least 10 % off** (`MIN_BADGE_DISCOUNT_PCT`); smaller cuts only show in
+  the sheet.
+- The sheet opens on **one row per chain** (its best sale, else its cheapest product), then the
+  biggest other discounts (max 2 per chain). "All N products ›" opens one chain's full list — a
+  broad item like "хляб" matches hundreds of products, which a single price-sorted list buried.
 - Prices are reported for the previous day; anything older than **2 days** is hidden, so a job
   that stops running can never leave a stale "sale" on screen.
 

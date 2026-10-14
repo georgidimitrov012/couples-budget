@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { authErrorProblem, normalizeEmail, type Problem } from '../../../lib/auth-validation';
 import { supabase } from '../../../lib/supabase';
 import { useTranslation } from '../../../hooks/useTranslation';
 
@@ -24,26 +25,27 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const error = problem ? t(problem.key, problem.params) : null;
 
   async function handleSignIn() {
     if (loading) return;
-    setError(null);
+    setProblem(null);
     if (!email.trim() || !password) {
-      setError(t('error.enterCreds'));
+      setProblem({ key: 'error.enterCreds' });
       return;
     }
 
     setLoading(true);
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: normalizeEmail(email),
       password,
     });
     setLoading(false);
 
     // On success, onAuthStateChange updates the session and the root guard
     // redirects into the app — no manual navigation needed here.
-    if (signInError) setError(signInError.message);
+    if (signInError) setProblem(authErrorProblem(signInError));
   }
 
   const inputStyle = [
@@ -101,6 +103,18 @@ export default function SignInScreen() {
                 {error}
               </ThemedText>
             )}
+
+            <Link href="/forgot-password" asChild>
+              <Pressable
+                disabled={loading}
+                accessibilityRole="button"
+                hitSlop={8}
+                style={styles.forgot}>
+                <ThemedText type="small" style={styles.link}>
+                  {t('signin.forgot')}
+                </ThemedText>
+              </Pressable>
+            </Link>
 
             <Pressable
               onPress={handleSignIn}
@@ -166,4 +180,5 @@ const styles = StyleSheet.create({
   buttonText: { color: Accent.onPrimary, fontWeight: '600', fontSize: 16 },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   link: { color: Accent.primary, fontWeight: '600' },
+  forgot: { alignSelf: 'flex-end' },
 });

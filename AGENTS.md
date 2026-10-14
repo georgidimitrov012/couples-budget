@@ -44,6 +44,11 @@ with a 6-character invite code.
 - Always handle the three permission states (not asked / denied / granted) and the
   offline state gracefully (banner + retry).
 - Every list/data screen needs explicit empty, loading, and error states.
+- **Never store translated text.** What the app itself names is stored as a key and translated
+  on display (grocery aisles → `grocery.<key>`). Shopping-list items are free text in the author's
+  language, so show them with `displayItemName(name, lang)` and compare them with `sameItem(a, b)`
+  (`lib/groceries.ts`) — never `name.toLowerCase() ===`. That keeps a household where each partner
+  uses a different language (or one who switches) from seeing a mixed list.
 - **Supermarket deals** (`src/features/deals/`) is a self-contained, *removable* feature with a
   remote on/off switch. Keep all of its code in that folder; the rest of the app touches it only
   from the List tab via `@/features/deals` (a regression test enforces this). See `docs/DEALS.md`.
@@ -68,6 +73,8 @@ with a 6-character invite code.
   (jest-expo + Testing Library, no network) under `__tests__/`; and
   **`pnpm test:security`** — the live RLS/penetration suite (`tests/security/`) that
   exercises the real Supabase security boundary. `pnpm test:all` runs both.
+- **UI changes also get a pass of [`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md) on a real
+  phone** (both languages) before merge — it walks the List ↔ Budget and BG ↔ EN joins.
 - **Run the entire collection (`pnpm test:all`) before every merge to `main`.** Do not
   merge with a red suite.
 - **Whenever you add or change code, add or update tests to match** — new screens/hooks

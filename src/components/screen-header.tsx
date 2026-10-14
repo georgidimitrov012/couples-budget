@@ -20,7 +20,10 @@ type Props = {
  * ("Списък за пазаруване" clipped "Изчисти", "Повтарящи се разходи" clipped
  * "Готово") but any long translation would.
  *
- * So: the title shrinks and wraps to two lines, the action never shrinks.
+ * Then the opposite broke: a wide action (Budget's three links in Bulgarian)
+ * squeezed the title to "Бю / д…". So now the row wraps: the title keeps at least
+ * its own width and, when the action can't fit beside it, the action drops to
+ * its own line (still right-aligned). Neither side can crush the other.
  */
 export function ScreenHeader({ title, children, style }: Props) {
   return (
@@ -36,16 +39,18 @@ export function ScreenHeader({ title, children, style }: Props) {
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.three,
+    columnGap: Spacing.three,
+    rowGap: Spacing.two,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.three,
   },
-  // flexShrink (not flex) so a short title still hugs its text and the action
-  // stays hard right; numberOfLines={2} above turns overflow into a wrap.
+  // flexShrink (not flex) so a short title still hugs its text; a title longer
+  // than the screen wraps to two lines (numberOfLines above).
   title: { flexShrink: 1 },
-  // The action is the thing that must never be clipped — it's how you leave the
-  // screen. It keeps its intrinsic width and the title gives way instead.
-  action: { flexShrink: 0 },
+  // The action must never be clipped — it's how you leave the screen. It keeps
+  // its width; auto margin keeps it right-aligned even after wrapping.
+  action: { flexShrink: 0, marginLeft: 'auto' },
 });

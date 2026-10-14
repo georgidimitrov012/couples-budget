@@ -26,6 +26,7 @@ import {
   type LineAction,
   type ReviewLine,
 } from '../../../lib/receipt';
+import { displayItemName } from '../../../lib/groceries';
 import { useCurrency } from '../../../hooks/useCurrency';
 import { useListItems } from '../../../hooks/useListItems';
 import { useReceiptScan } from '../../../hooks/useReceiptScan';
@@ -239,13 +240,13 @@ function ReviewRow({
   onChange: (patch: Partial<ReviewLine>) => void;
 }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const actions: { value: LineAction; label: string; hidden?: boolean }[] = [
     { value: 'add', label: t('receipt.actionAdd') },
     {
       value: 'check',
       label: line.matchName
-        ? t('receipt.actionCheckNamed', { name: line.matchName })
+        ? t('receipt.actionCheckNamed', { name: displayItemName(line.matchName, lang) })
         : t('receipt.actionCheck'),
       hidden: !line.listItemId,
     },

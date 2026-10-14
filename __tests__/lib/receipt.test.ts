@@ -46,6 +46,10 @@ describe('matchListItem', () => {
   it('returns null when nothing is close', () => {
     expect(matchListItem('Dish soap', listItems)).toBeNull();
   });
+  it('matches the same catalog item listed in the other language', () => {
+    const bg = [{ id: 'c1', name: 'Моркови', is_checked: false }];
+    expect(matchListItem('Carrots', bg)?.id).toBe('c1');
+  });
   it('ignores already-checked list items', () => {
     expect(matchListItem('bananas', listItems)).toBeNull();
   });

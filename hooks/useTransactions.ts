@@ -193,7 +193,7 @@ export function useTransactions() {
   }, []);
 
   // Edit an existing transaction (owner-only per RLS). Optimistic, rolled back on
-  // error; the date isn't editable so the row stays in its month.
+  // error. Changing the date can move the row to another month.
   const updateTransaction = useCallback(
     async (
       tx: Transaction,
@@ -202,6 +202,7 @@ export function useTransactions() {
         description?: string;
         scope?: TransactionScope;
         categoryId?: string | null;
+        occurredOn?: string;
       }
     ) => {
       const uid = userIdRef.current;
@@ -212,6 +213,7 @@ export function useTransactions() {
           changes.description !== undefined ? changes.description.trim() || null : tx.description,
         scope: changes.scope ?? tx.scope,
         category_id: changes.categoryId !== undefined ? changes.categoryId : tx.category_id,
+        occurred_on: changes.occurredOn ?? tx.occurred_on,
       };
       if (!Number.isFinite(updated.amount) || updated.amount <= 0) return;
       setItems((prev) => upsert(prev, updated, uid));
@@ -223,6 +225,7 @@ export function useTransactions() {
           description: updated.description,
           scope: updated.scope,
           category_id: updated.category_id,
+          occurred_on: updated.occurred_on,
         })
         .eq('id', tx.id);
 

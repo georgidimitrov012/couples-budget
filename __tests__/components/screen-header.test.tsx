@@ -49,4 +49,19 @@ describe('ScreenHeader', () => {
     const wrapper = screen.getByTestId('action').parent;
     expect(StyleSheet.flatten(wrapper?.props.style).flexShrink).toBe(0);
   });
+
+  // The opposite bug: a wide action (Budget's links in Bulgarian) squeezed the
+  // title to "Бю / д…". The row wraps, so the action drops to its own line
+  // (still right-aligned) instead of crushing the title.
+  it('wraps a wide action onto its own line instead of crushing the title', async () => {
+    const { toJSON } = await render(
+      <ScreenHeader title="Бюджет">
+        <Text testID="action">Статистика Категории Повтарящи се</Text>
+      </ScreenHeader>,
+    );
+    const row = toJSON() as { props: { style: unknown } };
+    expect(StyleSheet.flatten(row.props.style as never).flexWrap).toBe('wrap');
+    const wrapper = screen.getByTestId('action').parent;
+    expect(StyleSheet.flatten(wrapper?.props.style).marginLeft).toBe('auto');
+  });
 });

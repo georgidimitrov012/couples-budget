@@ -3,6 +3,7 @@ import {
   bestSale,
   compareOffers,
   cutoffDate,
+  summarizeOffers,
   toOffer,
   type DealPriceRow,
 } from '@/features/deals/deals';
@@ -87,6 +88,13 @@ describe('bestSale', () => {
     expect(sale.otherChains).toBe(0);
   });
 
+  it('ignores token discounts (under 10%) for the badge', () => {
+    const garlic = (promo: number) =>
+      row({ chain: 'lidl', product_name: 'Чесън на кг', group_code: 59, retail_price: 5.32, promo_price: promo, promo_share: 1 });
+    expect(bestSale(matchItem('Чесън')!, [garlic(5.11)], CUTOFF)).toBeNull(); // −4%
+    expect(bestSale(matchItem('Чесън')!, [garlic(4.5)], CUTOFF)?.best.discountPct).toBe(15);
+  });
+
   it('is null when only some stores have a promo', () => {
     expect(bestSale(matchItem('червени домати')!, rows, CUTOFF)).toBeNull();
   });
@@ -112,5 +120,50 @@ describe('allOffers', () => {
       ['kaufland', 1.29, true],
       ['lidl', 2.25, false],
     ]);
+  });
+});
+
+describe('summarizeOffers', () => {
+  const offer = (chain: string, name: string, retail: number, promo: number | null = null) =>
+    toOffer({
+      chain,
+      product_name: name,
+      group_code: 1,
+      retail_price: retail,
+      promo_price: promo,
+      promo_share: promo == null ? 0 : 1,
+      price_date: '2026-10-12',
+    });
+
+  // Regression: "bread" listed ~280 products, all from the cheapest chain.
+  it('gives one row per chain — its sale if it has one, else its cheapest — sales first', () => {
+    const offers = [
+      ...Array.from({ length: 50 }, (_, i) => offer('lidl', `Хляб ${i}`, 0.5 + i / 100)),
+      offer('kaufland', 'Хляб Добруджа', 1.2, 0.9),
+      offer('kaufland', 'Хляб типов', 0.8),
+      offer('billa', 'Хляб бял', 1.1),
+    ];
+    const { chains } = summarizeOffers(offers);
+    expect(chains.map((c) => c.chain)).toEqual(['kaufland', 'lidl', 'billa']);
+    expect(chains[0].best.productName).toBe('Хляб Добруджа');
+    expect(chains[1].best.productName).toBe('Хляб 0');
+    expect(chains[1].offers).toHaveLength(50);
+  });
+
+  it('lists the biggest other discounts, at most two per chain, never repeating a chain row', () => {
+    const offers = [
+      offer('lidl', 'A', 2, 1), // 50% — lidl's best
+      offer('lidl', 'B', 2, 1.2), // 40%
+      offer('lidl', 'C', 2, 1.4), // 30%
+      offer('lidl', 'D', 2, 1.6), // 20% — third from lidl, dropped
+      offer('billa', 'E', 2, 1.5), // billa's best
+      offer('billa', 'F', 10, 9), // 10%
+    ];
+    const { topDeals } = summarizeOffers(offers);
+    expect(topDeals.map((o) => o.productName)).toEqual(['B', 'C', 'F']);
+  });
+
+  it('is empty for no offers', () => {
+    expect(summarizeOffers([])).toEqual({ chains: [], topDeals: [] });
   });
 });

@@ -23,8 +23,8 @@ import { Accent, BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from
 import { useTheme } from '@/hooks/use-theme';
 import { budgetAlerts, budgetLevel, monthlySpendByCategory, progressRatio } from '../../../../lib/budget';
 import { parseAmount } from '../../../../lib/format';
-import { categorize } from '../../../../lib/groceries';
-import { monthLong } from '../../../../lib/month';
+import { categorize, displayItemName, findListMatch, sameItem } from '../../../../lib/groceries';
+import { addDays, dayLabel, lastDayOfMonth, localDay, monthLong } from '../../../../lib/month';
 import { monthKeyOf, nextMonthKey, previousMonthKey } from '../../../../lib/stats';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useCategories, type Category } from '../../../../hooks/useCategories';
@@ -61,16 +61,30 @@ export default function BudgetScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   // Optional wiring to the shopping list (see the "List↔Budget model" in AGENTS): an
   // expense can complete a listed item (quantity-aware) or log an off-list buy onto it.
+  // A list item picked by hand; otherwise the one the description names is linked
+  // automatically ("Carrots" ticks off "Моркови") unless the user chose "None".
   const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
-  const [boughtQty, setBoughtQty] = useState(1);
+  const [autoLinkOff, setAutoLinkOff] = useState(false);
+  // null = all of the listed quantity.
+  const [boughtQty, setBoughtQty] = useState<number | null>(null);
   const [addToList, setAddToList] = useState(false);
   // Non-null while editing an existing transaction (the add form doubles as the
   // edit form, pre-filled). Only the owner can edit (transactions_update RLS).
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The day the expense happened; null = the default for the month on screen
+  // (today, or the last day of a past month you're looking at).
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
 
   const currentMonth = monthKeyOf(new Date());
   const [monthKey, setMonthKey] = useState(currentMonth);
   const isCurrentMonth = monthKey === currentMonth;
+  const today = localDay();
+  const formDate = pickedDate ?? (isCurrentMonth ? today : lastDayOfMonth(monthKey));
+
+  function goToMonth(key: string) {
+    setMonthKey(key);
+    if (!editingId) setPickedDate(null); // follow the month unless mid-edit
+  }
 
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -80,25 +94,28 @@ export default function BudgetScreen() {
   const canAdd = parsedAmount != null;
 
   const activeItems = useMemo(() => listItems.filter((i) => !i.is_checked), [listItems]);
-  const linkedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
   const trimmedDesc = description.trim();
-  const activeNames = useMemo(
-    () => new Set(activeItems.map((i) => i.name.toLowerCase())),
-    [activeItems]
-  );
-  // Offer "also add to the list" only for a fresh off-list name (not one already listed).
+  const pickedItem = activeItems.find((i) => i.id === linkedItemId) ?? null;
+  const autoItem =
+    !pickedItem && !autoLinkOff && !editingId ? findListMatch(trimmedDesc, activeItems) : null;
+  const linkedItem = pickedItem ?? autoItem;
+  const bought = linkedItem ? Math.min(boughtQty ?? linkedItem.quantity, linkedItem.quantity) : 1;
+  // Offer "also log it on the list" only for a fresh off-list name (not one already
+  // listed — in either language: "Carrots" is listed when "Моркови" is).
   const showAddToList =
-    !linkedItemId && trimmedDesc.length > 0 && !activeNames.has(trimmedDesc.toLowerCase());
+    !linkedItem && trimmedDesc.length > 0 && !activeItems.some((i) => sameItem(i.name, trimmedDesc));
 
   function selectListItem(item: ListItem | null) {
+    setBoughtQty(null);
     if (!item) {
       setLinkedItemId(null);
+      setAutoLinkOff(true);
       return;
     }
     setLinkedItemId(item.id);
-    setBoughtQty(item.quantity);
+    setAutoLinkOff(false);
     setAddToList(false);
-    if (!description.trim()) setDescription(item.name);
+    if (!description.trim()) setDescription(displayItemName(item.name, lang));
   }
 
   const monthItems = items.filter((t) => t.occurred_on.startsWith(monthKey));
@@ -121,16 +138,20 @@ export default function BudgetScreen() {
     if (parsedAmount == null) return;
     const selectedCategoryId = categoryId;
     const linked = linkedItem;
-    const finalDesc = trimmedDesc || linked?.name || '';
-    const bought = boughtQty;
+    const finalDesc = trimmedDesc || (linked ? displayItemName(linked.name, lang) : '');
     const alsoAdd = showAddToList && addToList;
+    const occurredOn = formDate;
 
     resetForm();
+    // Show the month the expense landed in (stepping the date back past the 1st
+    // moves it to the previous month).
+    setMonthKey(occurredOn.slice(0, 7));
 
     await addTransaction({
       amount: parsedAmount,
       description: finalDesc,
       scope,
+      occurredOn,
       categoryId: selectedCategoryId ?? undefined,
     });
 
@@ -148,9 +169,11 @@ export default function BudgetScreen() {
     setDescription('');
     setCategoryId(null);
     setLinkedItemId(null);
-    setBoughtQty(1);
+    setAutoLinkOff(false);
+    setBoughtQty(null);
     setAddToList(false);
     setEditingId(null);
+    setPickedDate(null);
   }
 
   // Load a transaction into the form to edit it (owner-only).
@@ -160,6 +183,7 @@ export default function BudgetScreen() {
     setDescription(tx.description ?? '');
     setScope(tx.scope);
     setCategoryId(tx.category_id);
+    setPickedDate(tx.occurred_on);
     setLinkedItemId(null);
     setAddToList(false);
   }
@@ -170,13 +194,16 @@ export default function BudgetScreen() {
     const selectedCategoryId = categoryId;
     const nextScope = scope;
     const nextDesc = trimmedDesc;
+    const occurredOn = formDate;
     resetForm();
+    setMonthKey(occurredOn.slice(0, 7));
     if (original) {
       await updateTransaction(original, {
         amount: parsedAmount,
         description: nextDesc,
         scope: nextScope,
         categoryId: selectedCategoryId,
+        occurredOn,
       });
     }
   }
@@ -187,16 +214,21 @@ export default function BudgetScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.inner}>
-          <ScreenHeader title={t('budget.title')}>
-            <View style={styles.headerLinks}>
+          <ScreenHeader title={t('budget.title')} />
+          {/* The screen's sub-pages get their own row: three links beside the title
+              left it no room in Bulgarian ("Бю / д…"). */}
+          <View style={styles.navRow}>
               <Link href="/stats" asChild>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('stats.title')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('stats.title')}
+                    📊 {t('stats.title')}
                   </ThemedText>
                 </Pressable>
               </Link>
@@ -204,10 +236,13 @@ export default function BudgetScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('budget.manageCategories')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('budget.categories')}
+                    🏷️ {t('budget.categories')}
                   </ThemedText>
                 </Pressable>
               </Link>
@@ -215,19 +250,21 @@ export default function BudgetScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('recurring.title')}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && styles.pressed}>
+                  style={({ pressed }) => [
+                    styles.navPill,
+                    { backgroundColor: theme.backgroundElement },
+                    pressed && styles.pressed,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.link}>
-                    {t('budget.recurring')}
+                    🔁 {t('budget.recurring')}
                   </ThemedText>
                 </Pressable>
               </Link>
-            </View>
-          </ScreenHeader>
+          </View>
 
           <View style={styles.switcher}>
             <Pressable
-              onPress={() => setMonthKey(previousMonthKey(monthKey))}
+              onPress={() => goToMonth(previousMonthKey(monthKey))}
               accessibilityRole="button"
               accessibilityLabel={t('stats.prevMonth')}
               hitSlop={8}
@@ -236,7 +273,7 @@ export default function BudgetScreen() {
             </Pressable>
             <ThemedText style={styles.switchLabel}>{monthLong(monthKey, lang)}</ThemedText>
             <Pressable
-              onPress={() => setMonthKey(nextMonthKey(monthKey))}
+              onPress={() => goToMonth(nextMonthKey(monthKey))}
               disabled={isCurrentMonth}
               accessibilityRole="button"
               accessibilityState={{ disabled: isCurrentMonth }}
@@ -285,8 +322,8 @@ export default function BudgetScreen() {
               <CategoryBudgets budgets={budgets} spendByCategory={spendByCategory} />
             )}
 
-            {(isCurrentMonth || editingId) && (
-              <ThemedView type="backgroundElement" style={styles.addCard}>
+            {/* Shown on every month: past months add to that month (backdating). */}
+            <ThemedView type="backgroundElement" style={styles.addCard}>
               <View style={styles.amountRow}>
                 <TextInput
                   style={[styles.amountInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -310,6 +347,12 @@ export default function BudgetScreen() {
                 onChangeText={setDescription}
                 returnKeyType="done"
                 onSubmitEditing={editingId ? handleUpdate : handleAdd}
+              />
+
+              <DateField
+                date={formDate}
+                today={today}
+                onChange={setPickedDate}
               />
 
               {categories.length > 0 && (
@@ -340,8 +383,9 @@ export default function BudgetScreen() {
                 <ListLink
                   activeItems={activeItems}
                   linkedItem={linkedItem}
+                  autoLinked={!!autoItem}
                   onSelect={selectListItem}
-                  boughtQty={boughtQty}
+                  boughtQty={bought}
                   onBoughtQty={setBoughtQty}
                   showAddToList={showAddToList}
                   addToList={addToList}
@@ -375,8 +419,7 @@ export default function BudgetScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-              </ThemedView>
-            )}
+            </ThemedView>
 
             {error && (
               <Pressable
@@ -629,6 +672,7 @@ function CategoryChip({
 function ListLink({
   activeItems,
   linkedItem,
+  autoLinked,
   onSelect,
   boughtQty,
   onBoughtQty,
@@ -639,6 +683,8 @@ function ListLink({
 }: {
   activeItems: ListItem[];
   linkedItem: ListItem | null;
+  /** The link came from the description, not a tap — say so, so it's never a surprise. */
+  autoLinked: boolean;
   onSelect: (item: ListItem | null) => void;
   boughtQty: number;
   onBoughtQty: (n: number) => void;
@@ -648,7 +694,7 @@ function ListLink({
   descLabel: string;
 }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   if (activeItems.length === 0 && !showAddToList) return null;
 
   return (
@@ -669,17 +715,26 @@ function ListLink({
               active={linkedItem === null}
               onPress={() => onSelect(null)}
             />
-            {activeItems.map((it) => (
-              <CategoryChip
-                key={it.id}
-                label={it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name}
-                accessibilityLabel={t('budget.listItem', { name: it.name })}
-                active={linkedItem?.id === it.id}
-                onPress={() => onSelect(it)}
-              />
-            ))}
+            {activeItems.map((it) => {
+              const name = displayItemName(it.name, lang);
+              return (
+                <CategoryChip
+                  key={it.id}
+                  label={it.quantity > 1 ? `${name} ×${it.quantity}` : name}
+                  accessibilityLabel={t('budget.listItem', { name })}
+                  active={linkedItem?.id === it.id}
+                  onPress={() => onSelect(it)}
+                />
+              );
+            })}
           </ScrollView>
         </>
+      )}
+
+      {linkedItem && autoLinked && (
+        <ThemedText type="small" themeColor="textSecondary" testID="auto-linked">
+          {t('budget.autoLinked', { name: displayItemName(linkedItem.name, lang) })}
+        </ThemedText>
       )}
 
       {linkedItem && (
@@ -746,6 +801,73 @@ function ListLink({
   );
 }
 
+// The day an expense happened: Today by default, stepped back a day at a time
+// (‹ ›), with a quick way back to today. Coarse jumps go through the month
+// switcher above — a past month defaults to its last day. No native picker, so
+// it needs no new build dependency and looks the same everywhere.
+function DateField({
+  date,
+  today,
+  onChange,
+}: {
+  date: string;
+  today: string;
+  onChange: (day: string) => void;
+}) {
+  const theme = useTheme();
+  const { t, lang } = useTranslation();
+  const atToday = date >= today;
+  const label = dayLabel(date, today, lang);
+  return (
+    <View style={styles.dateRow}>
+      <ThemedText type="small" themeColor="textSecondary">
+        {t('budget.date')}
+      </ThemedText>
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => onChange(addDays(date, -1))}
+          accessibilityRole="button"
+          accessibilityLabel={t('budget.prevDay')}
+          hitSlop={6}
+          style={({ pressed }) => [styles.stepBtn, { backgroundColor: theme.tint }, pressed && styles.pressed]}>
+          <ThemedText style={styles.stepBtnText}>‹</ThemedText>
+        </Pressable>
+        <ThemedText
+          style={styles.dateValue}
+          testID="expense-date"
+          accessibilityLabel={t('budget.dateA11y', { date: label })}>
+          {label}
+        </ThemedText>
+        <Pressable
+          onPress={() => onChange(addDays(date, 1))}
+          disabled={atToday}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: atToday }}
+          accessibilityLabel={t('budget.nextDay')}
+          hitSlop={6}
+          style={({ pressed }) => [
+            styles.stepBtn,
+            { backgroundColor: theme.tint, opacity: atToday ? 0.35 : pressed ? 0.6 : 1 },
+          ]}>
+          <ThemedText style={styles.stepBtnText}>›</ThemedText>
+        </Pressable>
+      </View>
+      {date !== today && (
+        <Pressable
+          onPress={() => onChange(today)}
+          accessibilityRole="button"
+          accessibilityLabel={t('budget.backToToday')}
+          hitSlop={8}
+          style={({ pressed }) => pressed && styles.pressed}>
+          <ThemedText type="smallBold" style={styles.link}>
+            {t('budget.todayShort')}
+          </ThemedText>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 function TransactionRow({
   item,
   category,
@@ -757,9 +879,11 @@ function TransactionRow({
   onRemove: () => void;
   onEdit?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { format } = useCurrency();
-  const desc = item.description || t('budget.expense');
+  // An expense bought from the list carries the item's name; show catalog items
+  // in the viewer's language like the list does. Free text stays as typed.
+  const desc = item.description ? displayItemName(item.description, lang) : t('budget.expense');
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
       <View style={styles.rowMain}>
@@ -835,15 +959,24 @@ const styles = StyleSheet.create({
   // content padding so the list can scroll fully clear of the native tab bar.
   scroll: { flex: 1 },
   link: { color: Accent.primary },
-  // Wraps to a second line on narrow screens / longer (Bulgarian) labels rather
-  // than squeezing the title off-screen.
-  headerLinks: {
+  // Wraps to a second line on narrow screens / longer labels.
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  dateValue: { minWidth: 96, textAlign: 'center', fontWeight: '600' },
+  navRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: Spacing.three,
-    alignItems: 'center',
-    flexShrink: 1,
+    gap: Spacing.two,
+    paddingBottom: Spacing.three,
+  },
+  navPill: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.pill,
   },
   switcher: {
     flexDirection: 'row',

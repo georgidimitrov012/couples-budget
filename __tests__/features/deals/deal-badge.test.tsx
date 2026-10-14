@@ -100,4 +100,32 @@ describe('DealBadge', () => {
     await user.press(screen.getByText(/Couldn't load prices/));
     await waitFor(() => expect(screen.getByText('No current prices for this item.')).toBeTruthy());
   });
+
+  // Regression: "bread" listed 280+ products, all from the cheapest chain.
+  it('shows one row per chain with a way into that chain’s full list', async () => {
+    const user = userEvent.setup();
+    result = {
+      data: [
+        row(),
+        ...Array.from({ length: 40 }, (_, i) =>
+          row({ chain: 'lidl', product_name: `Домати ${i}`, retail_price: 1 + i / 100, promo_price: null, promo_share: 0 })
+        ),
+      ],
+      error: null,
+    };
+    await render(<DealBadge deal={deal} />);
+    await user.press(screen.getByRole('button', { name: /On sale at Kaufland/ }));
+    await waitFor(() => expect(screen.getByText('Best at each store')).toBeTruthy());
+
+    expect(screen.getAllByText('Lidl')).toHaveLength(1);
+    expect(screen.queryByText('Домати 5')).toBeNull();
+
+    await user.press(screen.getByLabelText('Show all 40 products at Lidl'));
+    expect(screen.getByText('Lidl · 40 products')).toBeTruthy();
+    expect(screen.getByText('Домати 5')).toBeTruthy();
+    expect(screen.getByText('+ 10 more')).toBeTruthy();
+
+    await user.press(screen.getByText('‹ All stores'));
+    expect(screen.getByText('Best at each store')).toBeTruthy();
+  });
 });
