@@ -422,30 +422,46 @@ applying, `pnpm gen:types` (hand-added in `lib/database.types.ts` meanwhile).
 
 ---
 
-## 13. Push notifications — Edge Function + Database Webhooks
+## 13. Push notifications — Firebase, the function, the webhooks
 
-Sends the actual pushes. The `push-notify` function (`supabase/functions/push-notify/`) receives
-a Database Webhook, finds the *other* household member, and sends them a localized Expo push.
+The `push-notify` function (`supabase/functions/push-notify/`) is called by Database Webhooks,
+finds the *other* household member, and sends them a localized Expo push. Three parts, in order.
 
-### 13a. Deploy the function
+### 13a. Firebase (Android can't get a push token without it)
 
-```bash
-supabase functions deploy push-notify
+1. <https://console.firebase.google.com> → **Add project** (any name, Analytics off).
+2. **Add app → Android**, package name **`com.couplesbudget.app`** → Register → **download
+   `google-services.json`** → put it in the repo root (next to `app.json`). It identifies the
+   app to Firebase; it isn't a secret and is meant to ship inside the app.
+3. Firebase → ⚙ Project settings → **Service accounts** → **Generate new private key** → a JSON
+   file downloads. **This one IS secret** — never commit it.
+4. Give it to Expo: `pnpm dlx eas-cli credentials` → Android → `preview` (repeat for
+   `production`) → **Google Service Account → Manage your Google Service Account Key for Push
+   Notifications (FCM V1)** → upload that JSON. Then delete the file from Downloads.
+5. `app.json` → `android.googleServicesFile: "./google-services.json"` (done in the repo once the
+   file is there), then **rebuild** — Firebase is compiled into the app.
+
+### 13b. The function and its secret
+
+JWT verification is off for this function (webhooks send no user JWT), so it guards itself
+(`supabase/functions/_shared/push-guard.ts`): it only answers callers with a shared secret, and it
+re-reads every row it reports on — a forged call can't put text on anyone's phone.
+
+```powershell
+pnpm dlx supabase login
+# a random 64-character secret; keep it out of chat and git
+$secret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+pnpm dlx supabase secrets set "PUSH_WEBHOOK_SECRET=$secret" --project-ref tsmhvhhrluwupcyoiyoq
+pnpm dlx supabase functions deploy push-notify --no-verify-jwt --use-api --project-ref tsmhvhhrluwupcyoiyoq
+Add-Content .env "PUSH_WEBHOOK_SECRET=$secret"   # lets pnpm test:security attack the function
+$secret   # shown once, to paste into the webhooks below
 ```
 
-No secrets to set — it uses `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, which Edge Functions
-already have. It never verifies a user JWT (the caller is a trusted webhook), so deploy it with
-JWT verification off:
+### 13c. Database Webhooks (Dashboard → Database → Webhooks)
 
-```bash
-supabase functions deploy push-notify --no-verify-jwt
-```
-
-### 13b. Create the Database Webhooks (Dashboard → Database → Webhooks)
-
-Create **three** webhooks, all pointing to the function
-(`https://<project-ref>.supabase.co/functions/v1/push-notify`), method `POST`, with an
-`Authorization: Bearer <service-role-key>` header:
+Create **three**, each: type **HTTP Request**, method **POST**, URL
+`https://tsmhvhhrluwupcyoiyoq.supabase.co/functions/v1/push-notify`, and an HTTP header
+**`Authorization` = `Bearer <the secret from 13b>`** (not the service-role key).
 
 | Name | Table | Events |
 | --- | --- | --- |
@@ -453,20 +469,22 @@ Create **three** webhooks, all pointing to the function
 | `push_transactions` | `transactions` | Insert |
 | `push_members` | `household_members` | Insert |
 
-The function itself decides what's worth a push: a new **unchecked** list item (add), an
-`is_checked` flip false→true (bought), a **shared** transaction (expense), a new member (join).
-It skips everything else and skips solo households and members with no push token.
+The function decides what's worth a push: a new **unchecked** list item (add), an `is_checked`
+flip false→true (bought), a **shared** transaction (expense), a new member (join) — each only
+if the row really exists and changed in the last 2 minutes. Everything else is skipped, as are
+solo households and members with no push token.
 
-> Note: checking a *priced* list item both flips `is_checked` and inserts a shared transaction,
-> so the partner may get two related pushes (bought + expense). Acceptable for now.
+> Checking a list item from the Budget tab both ticks it and adds a shared expense, so the
+> partner may get two related pushes (bought + expense). Acceptable for now.
 
-### 13c. Smoke-test (needs two devices / accounts on a dev or EAS build)
+### 13d. Check it
 
-1. Both partners sign in on a real build and grant notifications (rows in `profiles` have a
-   `push_token`).
-2. Background the app on device B. On device A: add a list item → device B gets
-   "*A added … to the list*". Repeat for check-off, a shared expense, and a fresh join.
-3. Tapping the notification opens the list or budget. Verify the language matches device B's.
+1. `pnpm test:security` — the push-function checks stop skipping (no secret / wrong secret /
+   app key / user token all refused; forged and injected events send nothing).
+2. Two phones on the new build, both signed in and notifications allowed → each has a
+   `push_token` in `profiles`.
+3. App closed on phone B. On phone A: add an item, tick one, add a shared expense → B gets each
+   push in B's language; tapping opens the list / budget.
 
 ---
 
