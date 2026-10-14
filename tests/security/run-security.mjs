@@ -531,6 +531,57 @@ async function main() {
   }
 
   await accountChecks({ a, clientA, clientC });
+  await pushFunctionChecks({ itemId: dItem.id });
+}
+
+// ---------------------------------------------------------------------------
+// push-notify Edge Function: public URL, JWT verification OFF (webhooks carry no
+// user JWT). Only the shared secret may call it, and a call can't inject text.
+
+async function pushFunctionChecks({ itemId }) {
+  const fnUrl = `${url}/functions/v1/push-notify`;
+  const post = (headers, body) =>
+    fetch(fnUrl, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  const forged = {
+    type: 'INSERT',
+    table: 'list_items',
+    record: { id: itemId, is_checked: false, name: 'Click http://evil.example', added_by: itemId },
+  };
+
+  const noAuth = await post({}, forged);
+  if (noAuth.status === 404) {
+    console.log('SKIP  push-notify is not deployed — function checks skipped (SUPABASE_SETUP.md §13)');
+    return;
+  }
+  check('push function refuses a call with no secret', noAuth.status === 401, `HTTP ${noAuth.status}`);
+
+  const wrong = await post({ Authorization: 'Bearer not-the-secret' }, forged);
+  check('push function refuses a wrong secret', wrong.status === 401, `HTTP ${wrong.status}`);
+
+  const anonBearer = await post({ Authorization: `Bearer ${anonKey}`, apikey: anonKey }, forged);
+  check("push function refuses the app's public key", anonBearer.status === 401, `HTTP ${anonBearer.status}`);
+
+  const userJwt = (await (await authed(emails[0])).auth.getSession()).data.session?.access_token;
+  const asUser = await post({ Authorization: `Bearer ${userJwt}` }, forged);
+  check("push function refuses a signed-in user's token", asUser.status === 401, `HTTP ${asUser.status}`);
+
+  const secret = env.PUSH_WEBHOOK_SECRET;
+  if (!secret) {
+    console.log('SKIP  forged-payload checks need PUSH_WEBHOOK_SECRET in .env');
+    return;
+  }
+  const withSecret = (body) => post({ Authorization: `Bearer ${secret}` }, body).then((r) => r.json().catch(() => ({})));
+
+  const ghost = await withSecret({ ...forged, record: { ...forged.record, id: crypto.randomUUID() } });
+  check('a forged event for a row that does not exist sends nothing', ghost.sent !== true, JSON.stringify(ghost));
+
+  const injected = await withSecret({ ...forged, record: { ...forged.record, id: `${itemId}&select=*` } });
+  check('a forged event with an injected id sends nothing', injected.sent !== true, JSON.stringify(injected));
+
+  // A real, fresh item: the function must build the message from the database
+  // (test users have no push token, so it stops at "no token" — never "sent").
+  const real = await withSecret(forged);
+  check('a real event is processed but sends nothing without a push token', real.sent !== true, JSON.stringify(real));
 }
 
 // ---------------------------------------------------------------------------
