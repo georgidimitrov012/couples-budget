@@ -669,3 +669,45 @@ Settings** — e.g. Resend, free tier) and raise the rate limit (Authentication 
 The same applies if you later turn **Confirm email** back on (§3) — that's the step that stops
 someone signing up with an address they don't own.
 
+## 17. Accounts — server-side rules (the app's checks are not enough)
+
+The account penetration checks (`pnpm test:security`, "Accounts") call the Auth API directly,
+skipping the app. Two rules the app enforces were missing on the server:
+
+### 17a. Password policy (Dashboard)
+
+Authentication → **Providers → Email** (or Authentication → **Sign In / Providers**):
+- **Minimum password length:** `8`
+- **Password requirements:** **Letters and digits**
+
+Save. Existing accounts keep signing in with their current passwords; the rule applies to new
+sign-ups and password changes (including the reset screen).
+
+### 17b. Migration: display-name limits
+
+The partner sees `profiles.display_name`. The app caps it at 40 characters; without this a
+script could set a 500-character or blank name. Safe to run: all live names are 5–6 characters.
+
+```sql
+alter table public.profiles drop constraint if exists profiles_display_name_len;
+alter table public.profiles add constraint profiles_display_name_len
+  check (display_name is null or char_length(btrim(display_name)) between 1 and 40);
+
+-- Sign-up: trim the chosen name; a blank one falls back to the email's local part
+-- (cut to 40). An over-long chosen name violates the constraint, so the sign-up fails.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (
+    new.id,
+    coalesce(
+      nullif(btrim(new.raw_user_meta_data->>'display_name'), ''),
+      left(split_part(new.email, '@', 1), 40)
+    )
+  );
+  return new;
+end;
+$$;
+```
+

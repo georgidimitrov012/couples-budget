@@ -64,8 +64,9 @@ export function authErrorProblem(error: AuthErrorLike): Problem {
   if (code.startsWith('over_') || error?.status === 429 || msg.includes('rate limit')) {
     return { key: 'auth.err.rateLimit' };
   }
-  if (code === 'weak_password' || msg.includes('password should')) return { key: 'auth.err.weakPassword' };
+  // Before the weak-password check: Supabase words this one "New password should be different…".
   if (code === 'same_password' || msg.includes('different from the old')) return { key: 'auth.err.samePassword' };
+  if (code === 'weak_password' || msg.includes('password should')) return { key: 'auth.err.weakPassword' };
   if (code === 'otp_expired' || /token has expired|invalid.*(otp|token)/.test(msg)) {
     return { key: 'auth.err.badCode' };
   }

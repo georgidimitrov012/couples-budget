@@ -17,6 +17,9 @@ jest.mock('../../lib/supabase', () => ({
 
 import ForgotPasswordScreen from '../../src/app/(auth)/forgot-password';
 
+// The first render in a file is slow under a parallel or coverage run.
+jest.setTimeout(30000);
+
 beforeEach(() => {
   mockReset.mockReset().mockResolvedValue({ error: null });
   mockVerify.mockReset().mockResolvedValue({ error: null });
@@ -80,5 +83,84 @@ describe('ForgotPasswordScreen', () => {
     await enterNewPassword(user, '123456', 'short1');
     expect(screen.getByText(/at least 8 characters\./)).toBeTruthy();
     expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('asks for an email when it is empty', async () => {
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await user.press(screen.getByRole('button', { name: 'Send code' }));
+    expect(screen.getByText('Enter your email.')).toBeTruthy();
+    expect(mockReset).not.toHaveBeenCalled();
+  });
+
+  it('stays on the email step and explains when sending fails', async () => {
+    mockReset.mockResolvedValue({
+      error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' },
+    });
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    expect(await screen.findByText(/Too many attempts/)).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Code from the email')).toBeNull();
+  });
+
+  it('asks for the code when it is empty', async () => {
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    await user.type(await screen.findByPlaceholderText('New password'), 'newpass12');
+    await user.type(screen.getByPlaceholderText('Repeat password'), 'newpass12');
+    await user.press(screen.getByRole('button', { name: 'Set new password' }));
+    expect(screen.getByText('Enter the code from the email.')).toBeTruthy();
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('rejects mismatched new passwords before using the code', async () => {
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    await user.type(await screen.findByPlaceholderText('Code from the email'), '123456');
+    await user.type(screen.getByPlaceholderText('New password'), 'newpass12');
+    await user.type(screen.getByPlaceholderText('Repeat password'), 'newpass13');
+    await user.press(screen.getByRole('button', { name: 'Set new password' }));
+    expect(screen.getByText(/passwords don.t match/)).toBeTruthy();
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('tells the person when the new password is refused after the code worked', async () => {
+    mockUpdate.mockResolvedValue({
+      error: { code: 'same_password', message: 'New password should be different from the old password.' },
+    });
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    await enterNewPassword(user, '123456', 'newpass12');
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Reset your password',
+      'Choose a password different from your old one.'
+    );
+  });
+
+  it('can send a new code, or go back and use a different email', async () => {
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    await user.press(await screen.findByRole('button', { name: 'Send a new code' }));
+    expect(mockReset).toHaveBeenCalledTimes(2);
+
+    await user.press(screen.getByRole('button', { name: 'Use a different email' }));
+    expect(screen.getByPlaceholderText('Email')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Code from the email')).toBeNull();
+  });
+
+  it('ignores a second tap while sending', async () => {
+    let finish: (v: unknown) => void = () => {};
+    mockReset.mockReturnValue(new Promise((r) => (finish = r)));
+    const user = userEvent.setup();
+    await render(<ForgotPasswordScreen />);
+    await requestCode(user);
+    await user.press(screen.getByRole('button', { name: '' }));
+    expect(mockReset).toHaveBeenCalledTimes(1);
+    finish({ error: null });
   });
 });

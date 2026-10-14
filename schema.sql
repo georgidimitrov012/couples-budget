@@ -33,7 +33,10 @@ create table public.profiles (
   avatar_url  text,
   push_token  text, -- Expo push token for this user's device (see docs/SUPABASE_SETUP.md §11)
   locale      text, -- 'bg' | 'en' — app language, so push notifications are localized (§12)
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- The partner sees this name; the app caps it at 40, the server must too (§17).
+  constraint profiles_display_name_len
+    check (display_name is null or char_length(btrim(display_name)) between 1 and 40)
 );
 
 -- Auto-create a profile when a new auth user signs up
@@ -43,7 +46,12 @@ begin
   insert into public.profiles (id, display_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
+    -- A blank name falls back to the email's local part (cut to the 40-char limit);
+    -- an over-long chosen name violates profiles_display_name_len and the sign-up fails.
+    coalesce(
+      nullif(btrim(new.raw_user_meta_data->>'display_name'), ''),
+      left(split_part(new.email, '@', 1), 40)
+    )
   );
   return new;
 end;

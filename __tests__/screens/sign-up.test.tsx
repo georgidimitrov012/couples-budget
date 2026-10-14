@@ -8,6 +8,9 @@ jest.mock('../../lib/supabase', () => ({
 
 import SignUpScreen from '../../src/app/(auth)/sign-up';
 
+// The first render in a file is slow under a parallel or coverage run.
+jest.setTimeout(30000);
+
 beforeEach(() => mockSignUp.mockReset());
 
 type Form = { name?: string; email?: string; password?: string; confirm?: string };
@@ -90,5 +93,58 @@ describe('SignUpScreen', () => {
     await render(<SignUpScreen />);
     await submit(user, valid);
     expect(await screen.findByText('Check your email')).toBeTruthy();
+  });
+
+  it('treats a whitespace-only name as missing', async () => {
+    const user = userEvent.setup();
+    await render(<SignUpScreen />);
+    await submit(user, { ...valid, name: '   ' });
+    expect(screen.getByText(/Enter your name/)).toBeTruthy();
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it('sends a trimmed name', async () => {
+    mockSignUp.mockResolvedValue({ data: { session: { user: {} } }, error: null });
+    const user = userEvent.setup();
+    await render(<SignUpScreen />);
+    await submit(user, { ...valid, name: '  Ана  ' });
+    expect(mockSignUp).toHaveBeenCalledWith(
+      expect.objectContaining({ options: { data: { display_name: 'Ана' } } })
+    );
+  });
+
+  it.each(['abcdefgh', '12345678'])('rejects the one-kind-only password %s', async (pw) => {
+    const user = userEvent.setup();
+    await render(<SignUpScreen />);
+    await submit(user, { ...valid, password: pw });
+    expect(screen.getByText(/one letter and one number/)).toBeTruthy();
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it('shows the password rule up front', async () => {
+    await render(<SignUpScreen />);
+    expect(screen.getByText('At least 8 characters, with a letter and a number.')).toBeTruthy();
+  });
+
+  it('explains a rate limit in plain words', async () => {
+    mockSignUp.mockResolvedValue({
+      data: { session: null },
+      error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' },
+    });
+    const user = userEvent.setup();
+    await render(<SignUpScreen />);
+    await submit(user, valid);
+    expect(await screen.findByText(/Too many attempts/)).toBeTruthy();
+  });
+
+  it('ignores a second tap while creating the account', async () => {
+    let finish: (v: unknown) => void = () => {};
+    mockSignUp.mockReturnValue(new Promise((r) => (finish = r)));
+    const user = userEvent.setup();
+    await render(<SignUpScreen />);
+    await submit(user, valid);
+    await user.press(screen.getByRole('button', { name: '' }));
+    expect(mockSignUp).toHaveBeenCalledTimes(1);
+    finish({ data: { session: { user: {} } }, error: null });
   });
 });

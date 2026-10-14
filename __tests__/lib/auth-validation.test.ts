@@ -54,10 +54,18 @@ describe('authErrorProblem', () => {
     [{ status: 429, message: 'Too many' }, 'auth.err.rateLimit'],
     [{ code: 'weak_password' }, 'auth.err.weakPassword'],
     [{ code: 'same_password' }, 'auth.err.samePassword'],
+    [{ message: 'New password should be different from the old password.' }, 'auth.err.samePassword'],
     [{ code: 'otp_expired', message: 'Token has expired or is invalid' }, 'auth.err.badCode'],
     [{ message: 'Network request failed' }, 'auth.err.network'],
+    [{ code: 'email_address_invalid', message: 'Email address "x" is invalid' }, 'error.emailInvalid'],
+    [{ code: 'email_exists' }, 'auth.err.exists'],
+    [{ message: 'Password should be at least 6 characters.' }, 'auth.err.weakPassword'],
   ])('%j → %s', (error, key) => {
     expect(authErrorProblem(error).key).toBe(key);
+  });
+
+  it('handles a missing error without crashing', () => {
+    expect(authErrorProblem(null)).toEqual({ key: 'auth.err.generic', params: { message: '' } });
   });
 
   it('falls back to a generic message that keeps the original text', () => {

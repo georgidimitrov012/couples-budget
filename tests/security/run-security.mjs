@@ -529,6 +529,172 @@ async function main() {
     const hhFGone = await admin.from('households').select('id').eq('id', hhF.id);
     check('delete_account dissolved the solo household', (hhFGone.data?.length ?? 0) === 0);
   }
+
+  await accountChecks({ a, clientA, clientC });
+}
+
+// ---------------------------------------------------------------------------
+// Accounts: sign-up, sign-in, password reset, profiles. These go straight at the
+// Auth API with the public key — the app's own checks (lib/auth-validation.ts)
+// are a convenience; only what the server refuses is a security boundary.
+// No emails are sent: confirmation is OFF, reset codes come from the admin API.
+
+async function accountChecks({ a, clientA, clientC }) {
+  // Sign up a throwaway account directly; records the id so teardown deletes it
+  // even when a check fails because the server *accepted* something it shouldn't.
+  async function rawSignUp(tag, password, data) {
+    const email = `sec-acct-${tag}-${ts}@example.com`;
+    emails.push(email);
+    const res = await mkClient(anonKey).auth.signUp({ email, password, options: { data } });
+    if (res.data?.user?.id && res.data.user.identities?.length) userIds.push(res.data.user.id);
+    return res;
+  }
+  const accepted = (res) => res.error == null && !!res.data?.session;
+
+  // --- Sign-up ---
+  const dup = await mkClient(anonKey).auth.signUp({ email: a.email, password: `${pw}x` });
+  check('sign-up with an existing email is refused', !accepted(dup), dup.error?.message ?? 'ACCEPTED');
+
+  const dupCase = await mkClient(anonKey).auth.signUp({ email: a.email.toUpperCase(), password: `${pw}x` });
+  check(
+    'sign-up with an existing email in UPPER CASE is refused',
+    !accepted(dupCase),
+    dupCase.error?.message ?? 'ACCEPTED'
+  );
+
+  const badEmail = await mkClient(anonKey).auth.signUp({ email: 'not-an-email', password: pw });
+  check('sign-up with a malformed email is refused', badEmail.error != null, badEmail.error?.message ?? 'ACCEPTED');
+
+  const tiny = await rawSignUp('tiny', 'a1b2');
+  check('sign-up with a 4-character password is refused', !accepted(tiny), tiny.error?.message ?? 'ACCEPTED');
+
+  // The app asks for 8+ characters with a letter and a digit. Unless the project's
+  // Auth password policy says the same, a script can skip the app and use "aaaaaaa".
+  const lettersOnly = await rawSignUp('weak', 'abcdefgh');
+  check(
+    "server enforces the app's password rule (a letters-only password is refused)",
+    !accepted(lettersOnly),
+    lettersOnly.error?.message ?? 'ACCEPTED — set the policy in the dashboard (SUPABASE_SETUP.md §17)'
+  );
+  const sevenChars = await rawSignUp('short', 'abc1234');
+  check(
+    "server enforces the app's 8-character minimum",
+    !accepted(sevenChars),
+    sevenChars.error?.message ?? 'ACCEPTED — set the policy in the dashboard (SUPABASE_SETUP.md §17)'
+  );
+
+  const longName = await rawSignUp('longname', `${pw}A1`, { display_name: 'x'.repeat(500) });
+  check(
+    'sign-up with a 500-character display name is refused',
+    !accepted(longName),
+    longName.error?.message ?? 'ACCEPTED — run the §17 migration'
+  );
+
+  // Sign-up metadata is user-controlled. It must never grant a role or land in
+  // app_metadata (which is what server-side checks would trust).
+  const escalate = await rawSignUp('escalate', `${pw}A1`, {
+    display_name: 'Mallory',
+    role: 'service_role',
+    is_admin: true,
+    provider: 'admin',
+  });
+  const escUser = escalate.data?.user;
+  check(
+    'sign-up metadata cannot grant a role or app_metadata',
+    !escUser ||
+      (escUser.role === 'authenticated' &&
+        escUser.app_metadata?.role === undefined &&
+        escUser.app_metadata?.is_admin === undefined &&
+        escUser.app_metadata?.provider === 'email'),
+    escUser ? `role=${escUser.role} app_metadata=${JSON.stringify(escUser.app_metadata)}` : ''
+  );
+  if (accepted(escalate)) {
+    const escClient = mkClient(anonKey);
+    await escClient.auth.setSession(escalate.data.session);
+    const escRead = await escClient.from('transactions').select('id').limit(1);
+    check('a self-proclaimed "admin" still sees no one else\'s data', (escRead.data?.length ?? 0) === 0);
+  }
+
+  // --- Sign-in ---
+  const wrongPw = await mkClient(anonKey).auth.signInWithPassword({ email: a.email, password: `${pw}-wrong` });
+  check('sign-in with a wrong password is refused', wrongPw.error != null, wrongPw.error?.message ?? 'ACCEPTED');
+
+  const noUser = await mkClient(anonKey).auth.signInWithPassword({
+    email: `sec-nobody-${ts}@example.com`,
+    password: `${pw}-wrong`,
+  });
+  check(
+    'sign-in does not reveal whether an email has an account (same error for both)',
+    noUser.error != null &&
+      wrongPw.error != null &&
+      noUser.error.message === wrongPw.error.message &&
+      noUser.error.status === wrongPw.error.status,
+    `unknown: "${noUser.error?.message}" vs wrong password: "${wrongPw.error?.message}"`
+  );
+
+  const anonUpdate = await mkClient(anonKey).auth.updateUser({ password: `${pw}-hijack1` });
+  check('changing a password without a session is refused', anonUpdate.error != null);
+
+  // --- Password reset ---
+  const resetUnknown = await mkClient(anonKey).auth.resetPasswordForEmail(`sec-nobody-${ts}@example.com`);
+  check(
+    'reset request for an unknown email looks like success (no account enumeration)',
+    resetUnknown.error == null || resetUnknown.error.status === 429,
+    resetUnknown.error?.message ?? ''
+  );
+
+  const guessed = await mkClient(anonKey).auth.verifyOtp({ email: a.email, token: '000000', type: 'recovery' });
+  check('a guessed reset code is refused', guessed.error != null && !guessed.data?.session);
+
+  if (admin) {
+    const g = await createUser('g', 'Gina');
+    userIds.push(g.id);
+    const link = await admin.auth.admin.generateLink({ type: 'recovery', email: g.email });
+    const code = link.data?.properties?.email_otp;
+    if (!code) throw new Error('generateLink(recovery): ' + (link.error?.message ?? 'no email_otp'));
+
+    const otherEmail = await mkClient(anonKey).auth.verifyOtp({ email: a.email, token: code, type: 'recovery' });
+    check("a reset code can't be used for a different account", otherEmail.error != null && !otherEmail.data?.session);
+
+    const wrongType = await mkClient(anonKey).auth.verifyOtp({ email: g.email, token: code, type: 'signup' });
+    check('a reset code only works as a reset code', wrongType.error != null && !wrongType.data?.session);
+
+    const gClient = mkClient(anonKey);
+    const used = await gClient.auth.verifyOtp({ email: g.email, token: code, type: 'recovery' });
+    check('the real reset code signs in its own account', used.error == null && used.data?.user?.id === g.id);
+
+    const reuse = await mkClient(anonKey).auth.verifyOtp({ email: g.email, token: code, type: 'recovery' });
+    check('a reset code works only once', reuse.error != null && !reuse.data?.session);
+
+    const newPw = `${pw}-new1`;
+    const changed = await gClient.auth.updateUser({ password: newPw });
+    check('after the code, the new password can be set', changed.error == null, changed.error?.message ?? '');
+    const oldPw = await mkClient(anonKey).auth.signInWithPassword({ email: g.email, password: pw });
+    check('the old password stops working after a reset', oldPw.error != null);
+    const newIn = await mkClient(anonKey).auth.signInWithPassword({ email: g.email, password: newPw });
+    check('the new password works after a reset', newIn.error == null, newIn.error?.message ?? '');
+  } else {
+    console.log('SKIP  reset-code checks need SUPABASE_SERVICE_ROLE_KEY (codes come from the admin API, no email sent)');
+  }
+
+  // --- Profiles ---
+  const cReadsA = await clientC.from('profiles').select('id, display_name').eq('id', a.id);
+  check("an outsider can't read another person's profile", (cReadsA.data?.length ?? 0) === 0);
+
+  const cRenamesA = await clientC.from('profiles').update({ display_name: 'pwned' }).eq('id', a.id).select();
+  check("an outsider can't rename another person's profile", (cRenamesA.data?.length ?? 0) === 0);
+
+  const aMovesId = await clientA.from('profiles').update({ id: crypto.randomUUID() }).eq('id', a.id).select();
+  check("a user can't change their own profile id", aMovesId.error != null || (aMovesId.data?.length ?? 0) === 0);
+
+  const aHugeName = await clientA.from('profiles').update({ display_name: 'x'.repeat(500) }).eq('id', a.id).select();
+  check(
+    'a 500-character display name is refused on profile update',
+    aHugeName.error != null,
+    aHugeName.error?.message ?? 'ACCEPTED — run the §17 migration'
+  );
+  const aBlankName = await clientA.from('profiles').update({ display_name: '   ' }).eq('id', a.id).select();
+  check('a blank display name is refused on profile update', aBlankName.error != null, aBlankName.error?.message ?? 'ACCEPTED');
 }
 
 async function teardown() {
