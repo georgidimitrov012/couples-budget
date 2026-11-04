@@ -49,6 +49,11 @@ with a 6-character invite code.
   language, so show them with `displayItemName(name, lang)` and compare them with `sameItem(a, b)`
   (`lib/groceries.ts`) — never `name.toLowerCase() ===`. That keeps a household where each partner
   uses a different language (or one who switches) from seeing a mixed list.
+- **Time-limited allowances are enforced on the server, never on the phone.** Anything like
+  "3 scans a month", trial scans or a Premium seat change is counted and checked in Postgres with
+  the database clock (`now()`), month/day boundaries in `Europe/Sofia`, in one atomic
+  check-and-record that only the server can call. The app only shows what the server returns —
+  it never uses the device's date, time or time zone for a limit, and never self-asserts Premium.
 - **Supermarket deals** (`src/features/deals/`) is a self-contained, *removable* feature with a
   remote on/off switch. Keep all of its code in that folder; the rest of the app touches it only
   from the List tab via `@/features/deals` (a regression test enforces this). See `docs/DEALS.md`.
@@ -62,6 +67,13 @@ with a 6-character invite code.
 - Don't commit `.env`.
 
 ## Workflow
+- **The plan lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)** — priorities, status, decisions, what's
+  waiting on the owner. Update it in the same PR when any of those change.
+- **New screens are mocked up first** (design canvas) and built only after the owner approves.
+- **Every PR gets an independent review** by a fresh reviewer agent (security/RLS, edge cases,
+  both languages) before merge; fix or answer its findings in the PR.
+- Parallel developer agents only for features that don't touch the same files, each in its own
+  git worktree. `lib/i18n.ts` is shared by almost every feature — expect conflicts there.
 - Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
 - Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
 - When changing the schema, update `schema.sql`, run the migration, then regenerate types.
