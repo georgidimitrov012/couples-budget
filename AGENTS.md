@@ -62,6 +62,13 @@ with a 6-character invite code.
 - Don't commit `.env`.
 
 ## Workflow
+- **The plan lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)** — priorities, status, decisions, what's
+  waiting on the owner. Update it in the same PR when any of those change.
+- **New screens are mocked up first** (design canvas) and built only after the owner approves.
+- **Every PR gets an independent review** by a fresh reviewer agent (security/RLS, edge cases,
+  both languages) before merge; fix or answer its findings in the PR.
+- Parallel developer agents only for features that don't touch the same files, each in its own
+  git worktree. `lib/i18n.ts` is shared by almost every feature — expect conflicts there.
 - Use **Explore → Plan → Code → Commit**: propose a short plan before writing code.
 - Build one vertical feature end-to-end before starting the next (see BUILD_PLAN.md).
 - When changing the schema, update `schema.sql`, run the migration, then regenerate types.
