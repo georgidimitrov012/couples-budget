@@ -49,6 +49,11 @@ with a 6-character invite code.
   language, so show them with `displayItemName(name, lang)` and compare them with `sameItem(a, b)`
   (`lib/groceries.ts`) — never `name.toLowerCase() ===`. That keeps a household where each partner
   uses a different language (or one who switches) from seeing a mixed list.
+- **Time-limited allowances are enforced on the server, never on the phone.** Anything like
+  "3 scans a month", trial scans or a Premium seat change is counted and checked in Postgres with
+  the database clock (`now()`), month/day boundaries in `Europe/Sofia`, in one atomic
+  check-and-record that only the server can call. The app only shows what the server returns —
+  it never uses the device's date, time or time zone for a limit, and never self-asserts Premium.
 - **Supermarket deals** (`src/features/deals/`) is a self-contained, *removable* feature with a
   remote on/off switch. Keep all of its code in that folder; the rest of the app touches it only
   from the List tab via `@/features/deals` (a regression test enforces this). See `docs/DEALS.md`.

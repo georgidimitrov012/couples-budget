@@ -24,14 +24,20 @@ Roles are checkpoints in one pipeline, not separate teams:
 | Item | Status | Waiting on |
 |---|---|---|
 | **Push notifications** — PR #48 | Security fix + setup steps done; QA review running | Owner: Firebase, deploy, webhooks ([`SUPABASE_SETUP.md` §13](SUPABASE_SETUP.md)) |
-| **Premium design** | Model proposed; mockups on the design canvas | Owner: approve pricing, plans and hints |
+| **Premium** | Pricing and mockups approved; build starts with the server side (P1) | — |
 | **Recipes** | Research: legally usable, verified recipe sources | Research agent |
 
 ## Next
 
-1. **Premium** — Google Play subscriptions through RevenueCat; Premium stored per user/household in
-   Supabase; deals, extra receipt scans and recipes gated on the **server** (RLS/functions), never
-   only in the app. Starts after the mockups are approved.
+1. **Premium**, in three steps:
+   - **P1 — server:** subscriptions table; plan/tier and scan-quota functions on the server clock;
+     `scan-receipt` enforces the quota (today it has no limit at all); deals readable only with
+     Premium, plus a numbers-only teaser for free users; manual Premium for testers; live security
+     checks.
+   - **P2 — app:** Premium state, the paywall and the hints from the approved mockups.
+   - **P3 — store:** Google Play subscriptions (2 plans × monthly/yearly, 7-day trial offer),
+     RevenueCat and its webhook, the purchase flow (new build). Needs the owner's Google Play
+     developer account, which pulls the individual-or-ЕООД decision forward.
 2. **Recipes** — a verified collection (no AI call per request) matched to the list and this week's
    deals, plus each couple's own shared cookbook. Starts after the research.
 3. **Legal and launch** — its shape follows from Premium:
@@ -55,6 +61,9 @@ Roles are checkpoints in one pipeline, not separate teams:
 
 | Date | Decision |
 |---|---|
+| 2026-11-04 | Prices: 2,49 € for one / 4,49 € for two a month; 19,99 € / 34,99 € a year |
+| 2026-11-04 | 7-day free trial with 15 receipt scans; free plan: 3 scans a month; Premium mockups approved |
+| 2026-11-04 | Every time-limited allowance is counted and checked on the server's clock (Bulgarian time), never the phone's |
 | 2026-11-04 | Supermarket deals move to Premium |
 | 2026-11-04 | Recipes: gather verified recipes; no AI generation per request (running cost) |
 | 2026-11-04 | Team: roles as checkpoints (above) |
@@ -66,5 +75,5 @@ Roles are checkpoints in one pipeline, not separate teams:
 ## Waiting on the owner
 
 - Push: Firebase project + FCM key, `PUSH_WEBHOOK_SECRET`, deploy, 3 webhooks (§13)
-- Premium: approve the pricing model and the mockups
+- Premium P3: a Google Play developer account (individual or company) and a RevenueCat account
 - Deals testing: re-run the "Deals — refresh prices" workflow (prices hide after 2 days)
